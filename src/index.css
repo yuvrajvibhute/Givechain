@@ -1,0 +1,256 @@
+:root {
+  /* COLOR PALETTE: TRUST + WARMTH (Institutional Report & Public Ledger) */
+  --color-base: #F7F5F0;             /* Warm Paper Base */
+  --color-surface: #FFFFFF;          /* Card White */
+  --color-surface-muted: #EFECE4;    /* Ledger Section Background */
+  --color-primary: #0D3B4C;          /* Deep Slate Teal (Stability & Governance) */
+  --color-primary-light: #1A5266;    /* Soft Slate Teal Hover */
+  --color-accent: #C85A32;           /* Warm Terracotta Amber (CTA & Action Focus ONLY) */
+  --color-accent-hover: #B04B25;     /* Darker Terracotta Hover */
+  --color-ink: #141E24;              /* Deep Ink Text */
+  --color-ink-muted: #57656E;        /* Document Subtext */
+  --color-border: #E0D9CD;           /* Parchment Divider */
+  --color-border-subtle: #EDE8DF;    /* Light Ledger Row Divider */
+  --color-verified: #1F6E54;         /* On-Chain Verified Forest Green */
+  --color-verified-bg: #EAF4F0;      /* Verified Badge Light Background */
+
+  /* TYPOGRAPHY */
+  --font-serif: 'Merriweather', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* SHADOWS & RADIUS */
+  --radius-card: 14px;
+  --radius-btn: 10px;
+  --shadow-sm: 0 2px 8px rgba(13, 59, 76, 0.05);
+  --shadow-md: 0 6px 20px rgba(13, 59, 76, 0.08);
+  --shadow-hover: 0 12px 30px rgba(13, 59, 76, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-base);
+  color: var(--color-ink);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Classes */
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.015em;
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Base Layout Containers */
+.app-header {
+  background: rgba(247, 245, 240, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Institutional Card Design */
+.report-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.report-card:hover {
+  border-color: #C2B7A5;
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Hero Ledger Header Block */
+.hero-ledger-block {
+  background: var(--color-primary);
+  color: #F7F5F0;
+  border-radius: 18px;
+  padding: 2.25rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-ledger-block h2, .hero-ledger-block h3 {
+  color: #FFFFFF;
+}
+
+/* Signature Element: Segmented Contribution Bar */
+.segmented-progress-track {
+  width: 100%;
+  height: 10px;
+  background: var(--color-surface-muted);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--color-border);
+}
+
+.segmented-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 8px,
+    rgba(255, 255, 255, 0.25) 8px,
+    rgba(255, 255, 255, 0.25) 10px
+  );
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* CTAs & Buttons */
+.cta-button {
+  background-color: var(--color-accent);
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: var(--radius-btn);
+  padding: 0.65rem 1.35rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(200, 90, 50, 0.25);
+}
+
+.cta-button:hover {
+  background-color: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(200, 90, 50, 0.35);
+}
+
+.cta-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.secondary-button {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--radius-btn);
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+  background-color: var(--color-surface-muted);
+  border-color: var(--color-primary);
+}
+
+/* Verification Badge */
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-verified-bg);
+  color: var(--color-verified);
+  border: 1px solid rgba(31, 110, 84, 0.25);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+}
+
+/* Tab Navigation */
+.nav-tab {
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-btn);
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-tab:hover {
+  color: var(--color-primary);
+  background-color: rgba(13, 59, 76, 0.05);
+}
+
+.nav-tab.active {
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Transparent Ledger Table */
+.ledger-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ledger-table th {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-muted);
+  border-bottom: 2px solid var(--color-border);
+  padding: 0.85rem 1rem;
+}
+
+.ledger-table td {
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.875rem;
+}
+
+.ledger-table tr:hover td {
+  background-color: rgba(13, 59, 76, 0.02);
+}
+
+/* Code Snippet Box */
+.code-block {
+  background-color: #0F171C;
+  color: #38BDF8;
+  border-radius: 10px;
+  padding: 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.825rem;
+  overflow-x: auto;
+}
+
+/* Focus States Accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
