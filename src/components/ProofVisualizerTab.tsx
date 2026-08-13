@@ -1,181 +1,195 @@
-import React, { useState } from 'react';
-import { Cpu, ShieldAlert, Code2, Check, Play, Server, Lock, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ShieldCheck, Eye, EyeOff, Lock, Cpu, CheckCircle2 } from 'lucide-react';
 
-export const ProofVisualizerTab: React.FC = () => {
-  const [activeStep, setActiveStep] = useState<number>(0);
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  const compactSource = `pragma language_version >= 0.23;
-
-import CompactStandardLibrary;
-
-// Public ledger state
-export ledger totalDonations: Uint<64>;
-export ledger campaignCount: Uint<64>;
-export ledger activeCampaignTitle: Opaque<"string">;
-
-// Circuit: Create Campaign
-export circuit createCampaign(title: Opaque<"string">): [] {
-    activeCampaignTitle = disclose(title);
-    campaignCount = campaignCount + 1;
+interface ProofStepProps {
+  step: number;
+  title: string;
+  description: string;
+  isPrivate: boolean;
+  isActive: boolean;
+  isDone: boolean;
 }
 
-// Circuit: Make Anonymous Donation (Private Witness: donorSecret)
-export circuit donate(donorSecret: Bytes<32>, amount: Uint<64>): [] {
-    assert(amount > 0, "Donation amount must be greater than zero");
-    const disclosedAmount = disclose(amount);
-    totalDonations = totalDonations + disclosedAmount;
-}`;
+const ProofStep: React.FC<ProofStepProps> = ({
+  step,
+  title,
+  description,
+  isPrivate,
+  isActive,
+  isDone,
+}) => (
+  <div
+    className={`flex items-start gap-4 p-4 rounded-xl border transition-all duration-500 ${
+      isDone
+        ? 'border-[#1F6E54]/40 bg-[#EAF4F0]'
+        : isActive
+        ? 'border-[#0D3B4C]/40 bg-[#EFECE4] shadow-md'
+        : 'border-[#E0D9CD] bg-white opacity-60'
+    }`}
+  >
+    <div
+      className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+        isDone
+          ? 'bg-[#1F6E54] text-white'
+          : isActive
+          ? 'bg-[#0D3B4C] text-white animate-pulse'
+          : 'bg-[#E0D9CD] text-[#57656E]'
+      }`}
+    >
+      {isDone ? <CheckCircle2 className="w-4 h-4" /> : step}
+    </div>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-sm font-bold text-[#0D3B4C]">{title}</span>
+        {isPrivate ? (
+          <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/20 font-semibold">
+            <EyeOff className="w-2.5 h-2.5" /> PRIVATE
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#1F6E54]/10 text-[#1F6E54] border border-[#1F6E54]/20 font-semibold">
+            <Eye className="w-2.5 h-2.5" /> PUBLIC
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-[#57656E] leading-relaxed">{description}</p>
+    </div>
+  </div>
+);
 
-  const runSimulation = () => {
-    setIsSimulating(true);
-    setActiveStep(1);
+export const ProofVisualizerTab: React.FC = () => {
+  const [activeStep, setActiveStep] = useState<number>(-1);
+  const [isRunning, setIsRunning] = useState(false);
 
-    setTimeout(() => {
-      setActiveStep(2);
-      setTimeout(() => {
-        setActiveStep(3);
-        setTimeout(() => {
-          setActiveStep(4);
-          setIsSimulating(false);
-        }, 1200);
-      }, 1200);
-    }, 1200);
+  const steps = [
+    {
+      title: 'Private Witness Input',
+      description:
+        'Donor secret (Bytes<32>) is generated client-side and loaded into circuit scope. Never transmitted or stored anywhere.',
+      isPrivate: true,
+    },
+    {
+      title: 'Off-Chain ZK Proof Generation',
+      description:
+        'Midnight Compact runtime evaluates the donate() circuit locally. SHA-256 witness commitment is computed. Proof size: ~2.8KB.',
+      isPrivate: true,
+    },
+    {
+      title: 'Public Disclosure via disclose()',
+      description:
+        'Only the donation amount (Uint<64>) is disclosed on-chain using Compact disclose(amount). Donor identity stays hidden.',
+      isPrivate: false,
+    },
+    {
+      title: 'Midnight Network Submission',
+      description:
+        'ZK proof + disclosed public values are submitted via @midnight-ntwrk/midnight-js-network-provider to the Preprod indexer.',
+      isPrivate: false,
+    },
+  ];
+
+  const runVisualization = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    setActiveStep(-1);
+    for (let i = 0; i < steps.length; i++) {
+      setActiveStep(i);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    setActiveStep(steps.length); // All done
+    setIsRunning(false);
   };
+
+  useEffect(() => {
+    // Auto-start on mount
+    runVisualization();
+  }, []);
+
+  const isDone = (index: number) => activeStep > index;
+  const isActive = (index: number) => activeStep === index;
 
   return (
     <div className="space-y-6">
-      {/* Title & Interactive Control Banner */}
-      <div className="report-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Cpu className="w-5 h-5 text-[#0D3B4C]" />
-            <h2 className="text-xl font-bold font-serif text-[#0D3B4C]">ZK Circuit Proving Engine Visualizer</h2>
+      {/* Header Card */}
+      <div className="report-card p-5 border-[#E0D9CD]">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-[#0D3B4C] text-[#F7F5F0]">
+            <Cpu className="w-5 h-5" />
           </div>
-          <p className="text-xs text-[#57656E]">
-            Interactive pipeline representation of how Compact ZK circuits compile, generate private witnesses, and verify on Midnight.
-          </p>
-        </div>
-
-        <button
-          onClick={runSimulation}
-          disabled={isSimulating}
-          className="cta-button shrink-0"
-        >
-          <Play className="w-4 h-4 fill-current" />
-          <span>{isSimulating ? 'Running Simulation...' : 'Simulate ZK Proof Pipeline'}</span>
-        </button>
-      </div>
-
-      {/* Main Visual Pipeline */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Step 1 */}
-        <div className={`report-card p-5 space-y-3 relative overflow-hidden transition-all ${activeStep === 1 ? '!border-[#0D3B4C] !shadow-md bg-[#EFECE4]' : ''}`}>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono-num font-bold text-[#0D3B4C]">STEP 01</span>
-            {activeStep === 1 && <span className="w-2 h-2 rounded-full bg-[#0D3B4C] animate-ping" />}
-          </div>
-          <div className="p-2 rounded-lg bg-[#0D3B4C]/10 text-[#0D3B4C] w-fit">
-            <Lock className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-sm font-serif text-[#0D3B4C]">1. Witness Derivation</h3>
-          <p className="text-xs text-[#57656E] leading-relaxed">
-            Constructs private donor secret <code className="text-[#0D3B4C] font-mono-num font-semibold">donorSecret: Bytes&lt;32&gt;</code> off-chain inside execution environment.
-          </p>
-        </div>
-
-        {/* Step 2 */}
-        <div className={`report-card p-5 space-y-3 relative overflow-hidden transition-all ${activeStep === 2 ? '!border-[#0D3B4C] !shadow-md bg-[#EFECE4]' : ''}`}>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono-num font-bold text-[#0D3B4C]">STEP 02</span>
-            {activeStep === 2 && <span className="w-2 h-2 rounded-full bg-[#0D3B4C] animate-ping" />}
-          </div>
-          <div className="p-2 rounded-lg bg-[#0D3B4C]/10 text-[#0D3B4C] w-fit">
-            <Server className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-sm font-serif text-[#0D3B4C]">2. Proof Server Calculation</h3>
-          <p className="text-xs text-[#57656E] leading-relaxed">
-            Passes compiled circuit keys to HTTP proof server (port 6300) to build zero-knowledge proof snippet.
-          </p>
-        </div>
-
-        {/* Step 3 */}
-        <div className={`report-card p-5 space-y-3 relative overflow-hidden transition-all ${activeStep === 3 ? '!border-[#C85A32] !shadow-md bg-[#EFECE4]' : ''}`}>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono-num font-bold text-[#C85A32]">STEP 03</span>
-            {activeStep === 3 && <span className="w-2 h-2 rounded-full bg-[#C85A32] animate-ping" />}
-          </div>
-          <div className="p-2 rounded-lg bg-[#C85A32]/10 text-[#C85A32] w-fit">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-sm font-serif text-[#0D3B4C]">3. Public Disclosure</h3>
-          <p className="text-xs text-[#57656E] leading-relaxed">
-            Discloses contribution amount (<code className="text-[#C85A32] font-mono-num font-semibold">disclose(amount)</code>) without revealing identity or witness keys.
-          </p>
-        </div>
-
-        {/* Step 4 */}
-        <div className={`report-card p-5 space-y-3 relative overflow-hidden transition-all ${activeStep === 4 ? '!border-[#1F6E54] !shadow-md bg-[#EAF4F0]' : ''}`}>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono-num font-bold text-[#1F6E54]">STEP 04</span>
-            {activeStep === 4 && <span className="w-2 h-2 rounded-full bg-[#1F6E54] animate-ping" />}
-          </div>
-          <div className="p-2 rounded-lg bg-[#1F6E54]/10 text-[#1F6E54] w-fit">
-            <Check className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-sm font-serif text-[#0D3B4C]">4. On-Chain Verification</h3>
-          <p className="text-xs text-[#57656E] leading-relaxed">
-            Midnight substrate node verifies ZK proof validity and commits sum updates to totalDonations state.
-          </p>
-        </div>
-      </div>
-
-      {/* Source Code & Managed Assets */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-7 report-card p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Code2 className="w-5 h-5 text-[#0D3B4C]" />
-              <h3 className="text-lg font-bold font-serif text-[#0D3B4C]">Compact Contract Source Code</h3>
-            </div>
-            <span className="text-xs text-[#57656E] font-mono-num">contracts/charity_donation.compact</span>
-          </div>
-
-          <pre className="code-block text-xs leading-relaxed overflow-x-auto">
-            <code>{compactSource}</code>
-          </pre>
-        </div>
-
-        <div className="lg:col-span-5 report-card p-6 space-y-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Layers className="w-5 h-5 text-[#0D3B4C]" />
-              <h3 className="text-lg font-bold font-serif text-[#0D3B4C]">Compiled Managed Assets</h3>
-            </div>
-
-            <div className="space-y-3 text-xs font-mono-num">
-              <div className="p-3 rounded-lg bg-[#F7F5F0] border border-[#E0D9CD] flex items-center justify-between">
-                <span className="text-[#57656E]">Contract JS</span>
-                <span className="text-[#0D3B4C] font-semibold">contracts/managed/hello-world/index.js</span>
-              </div>
-              <div className="p-3 rounded-lg bg-[#F7F5F0] border border-[#E0D9CD] flex items-center justify-between">
-                <span className="text-[#57656E]">ZK Circuit Target</span>
-                <span className="text-[#0D3B4C] font-semibold">donate.zkir</span>
-              </div>
-              <div className="p-3 rounded-lg bg-[#F7F5F0] border border-[#E0D9CD] flex items-center justify-between">
-                <span className="text-[#57656E]">Compiler Version</span>
-                <span className="text-[#C85A32] font-semibold">{'>'}= 0.23.0</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-[#2A7B62]/10 border border-[#2A7B62]/20 text-xs text-[#1F6E54] space-y-1">
-            <span className="font-bold block">Privacy Architecture Guarantee</span>
-            <p className="text-[#1F6E54]/90">
-              Midnight separates public state (total raised) from private state (donor identity secrets).
+            <h2 className="text-base font-bold font-serif text-[#0D3B4C]">
+              ZK Proof Pipeline Visualizer
+            </h2>
+            <p className="text-xs text-[#57656E]">
+              Compact donate() circuit — Midnight Network Preprod Testnet
             </p>
           </div>
         </div>
+
+        {/* Privacy Legend */}
+        <div className="flex items-center gap-4 text-[11px] font-semibold mb-5">
+          <span className="flex items-center gap-1.5 text-[#C85A32]">
+            <EyeOff className="w-3 h-3" /> Private (Off-Chain Only)
+          </span>
+          <span className="flex items-center gap-1.5 text-[#1F6E54]">
+            <Eye className="w-3 h-3" /> Public (On-Chain / Indexer)
+          </span>
+        </div>
+
+        {/* Proof Steps */}
+        <div className="space-y-3">
+          {steps.map((step, i) => (
+            <ProofStep
+              key={i}
+              step={i + 1}
+              title={step.title}
+              description={step.description}
+              isPrivate={step.isPrivate}
+              isActive={isActive(i)}
+              isDone={isDone(i)}
+            />
+          ))}
+        </div>
+
+        {/* Replay Button */}
+        <button
+          onClick={runVisualization}
+          disabled={isRunning}
+          className="mt-5 cta-button py-2 text-xs w-full justify-center"
+        >
+          <ShieldCheck className="w-4 h-4" />
+          {isRunning ? 'Running ZK Proof Simulation...' : 'Replay ZK Proof Walkthrough'}
+        </button>
+      </div>
+
+      {/* ZK Guarantee Summary */}
+      <div className="report-card p-5 border-[#E0D9CD]">
+        <div className="flex items-center gap-2 mb-3">
+          <Lock className="w-4 h-4 text-[#1F6E54]" />
+          <h3 className="text-sm font-bold text-[#0D3B4C]">Privacy Guarantees Summary</h3>
+        </div>
+        <ul className="space-y-2 text-xs text-[#57656E]">
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#1F6E54] mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-[#0D3B4C]">Donor Identity Hidden:</strong> Wallet address
+              and witness key are never posted to the Midnight public ledger or indexer.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#1F6E54] mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-[#0D3B4C]">Amount Transparency:</strong> Donation amounts
+              are publicly visible for auditing via <code className="bg-[#EFECE4] px-1 rounded">disclose(amount)</code>.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#1F6E54] mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-[#0D3B4C]">Non-Zero Proof:</strong> Circuit asserts
+              amount &gt; 0 before disclosure. Invalid donations are rejected on-chain.
+            </span>
+          </li>
+        </ul>
       </div>
     </div>
   );
