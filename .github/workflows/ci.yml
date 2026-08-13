@@ -1,0 +1,63 @@
+name: GiveChain CI — Midnight ZK dApp
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Unit Tests ─────────────────────────────────────────────────────────────
+  test:
+    name: Run Contract & Frontend Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Vitest unit tests
+        run: npm run test
+
+  # ─── TypeScript Type Check ──────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm install
+      - name: Check TypeScript types
+        run: npm run build
+
+  # ─── Frontend Build ─────────────────────────────────────────────────────────
+  build:
+    name: Vite Production Build
+    runs-on: ubuntu-latest
+    needs: [test, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm install
+      - name: Build production bundle
+        run: npm run build:web
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
