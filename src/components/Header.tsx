@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, RefreshCw, ExternalLink, ChevronDown, CheckCircle } from 'lucide-react';
+import { Shield, RefreshCw, ExternalLink, ChevronDown, CheckCircle, LogOut } from 'lucide-react';
 import { NETWORKS } from '../api';
 
 interface HeaderProps {
@@ -11,6 +11,7 @@ interface HeaderProps {
   isSyncing: boolean;
   onRefresh: () => void;
   onOpenLaceModal: () => void;
+  onDisconnectLace: () => void;
   isLaceConnected: boolean;
 }
 
@@ -23,9 +24,10 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   onRefresh,
   onOpenLaceModal,
+  onDisconnectLace,
   isLaceConnected,
 }) => {
-  const currentConfig = NETWORKS[activeNetwork] || NETWORKS.undeployed;
+  const currentConfig = NETWORKS[activeNetwork] || NETWORKS.preprod;
 
   const truncateAddr = (addr: string) => {
     if (!addr || addr.length < 16) return addr;
@@ -101,17 +103,31 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           )}
 
-          {/* Lace Wallet Button */}
-          <button
-            onClick={onOpenLaceModal}
-            className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg border transition ${
-              isLaceConnected
-                ? 'bg-[#1F6E54]/10 text-[#1F6E54] border-[#1F6E54]/30'
-                : 'cta-button !py-1.5 !px-3.5 !text-xs'
-            }`}
-          >
-            {isLaceConnected ? 'Lace Connected' : 'Connect Lace'}
-          </button>
+          {/* Lace Wallet Status & Disconnect Button */}
+          {isLaceConnected ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onOpenLaceModal}
+                className="text-xs font-semibold px-3 py-1.5 rounded-l-lg border border-[#1F6E54]/30 bg-[#1F6E54]/10 text-[#1F6E54] hover:bg-[#1F6E54]/20 transition"
+              >
+                Lace Connected
+              </button>
+              <button
+                onClick={onDisconnectLace}
+                title="Disconnect Lace Wallet"
+                className="text-xs font-semibold px-2 py-1.5 rounded-r-lg border border-l-0 border-[#1F6E54]/30 bg-[#1F6E54]/10 text-[#1F6E54] hover:bg-rose-100 hover:text-rose-700 transition"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenLaceModal}
+              className="cta-button !py-1.5 !px-3.5 !text-xs"
+            >
+              Connect Lace
+            </button>
+          )}
 
           {/* Wallet Balance Badge */}
           <div className="flex items-center gap-2.5 bg-[#FFFFFF] border border-[#E0D9CD] px-3.5 py-1.5 rounded-lg text-xs font-mono-num">

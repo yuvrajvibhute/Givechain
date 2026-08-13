@@ -7,12 +7,13 @@ import { WalletTab } from './components/WalletTab';
 import { NetworkTab } from './components/NetworkTab';
 import { LaceWalletModal } from './components/LaceWalletModal';
 import { INITIAL_TRANSACTIONS, TransactionRecord } from './api';
+import { executeDonateCircuit, executeCreateCampaignCircuit, disconnectLaceWallet } from './dapp-connector';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'ledger' | 'proof' | 'wallet' | 'network'>('ledger');
-  const [activeNetwork, setActiveNetwork] = useState<string>('preview');
-  const [contractAddress] = useState<string>('ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a');
-  const [walletAddress, setWalletAddress] = useState<string>('mn_addr_preview1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
+  const [activeNetwork, setActiveNetwork] = useState<string>('preprod');
+  const [contractAddress] = useState<string>('020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d');
+  const [walletAddress, setWalletAddress] = useState<string>('mn_addr_preprod1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
   const [walletBalance] = useState<string>('1,250.00');
   const [dustBalance] = useState<string>('48.50');
   const [transactions, setTransactions] = useState<TransactionRecord[]>(INITIAL_TRANSACTIONS);
@@ -46,59 +47,70 @@ export function App() {
     showToast(`Lace Wallet Connected! Address: ${newAddress.slice(0, 14)}...`, 'success');
   };
 
-  const handleDonate = async (campaignTitle: string, amount: number, _donorSecret: string) => {
+  const handleDisconnectLace = async () => {
+    await disconnectLaceWallet();
+    setIsLaceConnected(false);
+    setWalletAddress('mn_addr_preprod1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
+    showToast('Lace Wallet Disconnected successfully.', 'info');
+  };
+
+  const handleDonate = async (campaignTitle: string, amount: number, donorSecret: string) => {
     setIsSubmitting(true);
-    const startMs = Date.now();
+    showToast('Executing Compact donate circuit & generating ZK proof...', 'info');
 
-    // Simulating off-chain ZK witness proof execution & state submission
-    await new Promise((r) => setTimeout(r, 2200));
+    try {
+      // Execute Compact circuit via Midnight SDK Network Provider & witness commitment engine
+      const result = await executeDonateCircuit(donorSecret, amount, contractAddress, activeNetwork);
 
-    const proofTimeMs = Date.now() - startMs;
-    const randomHash = '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const newTx: TransactionRecord = {
+        id: `tx-${Date.now()}`,
+        txHash: result.txHash,
+        circuitName: 'donate',
+        campaignTitle,
+        amount,
+        blockHeight: result.blockHeight,
+        timestamp: new Date().toISOString(),
+        status: 'confirmed',
+        proofTimeMs: result.proofTimeMs,
+        privacyGuarantee: 'Donor witness secret shielded off-chain in ZK proof commitment',
+      };
 
-    const newTx: TransactionRecord = {
-      id: `tx-${Date.now()}`,
-      txHash: `${randomHash.slice(0, 6)}...${randomHash.slice(-4)}`,
-      circuitName: 'donate',
-      campaignTitle,
-      amount,
-      blockHeight: 14893 + transactions.length,
-      timestamp: new Date().toISOString(),
-      status: 'confirmed',
-      proofTimeMs,
-      privacyGuarantee: 'Donor identity & witness secret shielded in ZK proof',
-    };
-
-    setTransactions([newTx, ...transactions]);
-    setIsSubmitting(false);
-    showToast(`Anonymous donation of $${amount} confirmed! Tx: ${newTx.txHash}`, 'success');
+      setTransactions([newTx, ...transactions]);
+      setIsSubmitting(false);
+      showToast(`Anonymous donation of $${amount} confirmed! Tx: ${newTx.txHash}`, 'success');
+    } catch (err) {
+      setIsSubmitting(false);
+      showToast(`Circuit execution error: ${err instanceof Error ? err.message : 'Transaction failed'}`, 'error');
+    }
   };
 
   const handleCreateCampaign = async (title: string, _category: string, _targetAmount: number) => {
     setIsSubmitting(true);
-    const startMs = Date.now();
+    showToast('Executing Compact createCampaign circuit...', 'info');
 
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const result = await executeCreateCampaignCircuit(title, contractAddress, activeNetwork);
 
-    const proofTimeMs = Date.now() - startMs;
-    const randomHash = '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const newTx: TransactionRecord = {
+        id: `tx-${Date.now()}`,
+        txHash: result.txHash,
+        circuitName: 'createCampaign',
+        campaignTitle: title,
+        amount: 0,
+        blockHeight: result.blockHeight,
+        timestamp: new Date().toISOString(),
+        status: 'confirmed',
+        proofTimeMs: result.proofTimeMs,
+        privacyGuarantee: 'Public campaign title disclosed to Midnight indexer',
+      };
 
-    const newTx: TransactionRecord = {
-      id: `tx-${Date.now()}`,
-      txHash: `${randomHash.slice(0, 6)}...${randomHash.slice(-4)}`,
-      circuitName: 'createCampaign',
-      campaignTitle: title,
-      amount: 0,
-      blockHeight: 14893 + transactions.length,
-      timestamp: new Date().toISOString(),
-      status: 'confirmed',
-      proofTimeMs,
-      privacyGuarantee: 'Public campaign title disclosed to Midnight indexer',
-    };
-
-    setTransactions([newTx, ...transactions]);
-    setIsSubmitting(false);
-    showToast(`Charity campaign "${title}" registered on Midnight!`, 'success');
+      setTransactions([newTx, ...transactions]);
+      setIsSubmitting(false);
+      showToast(`Charity campaign "${title}" registered on Midnight! Tx: ${newTx.txHash}`, 'success');
+    } catch (err) {
+      setIsSubmitting(false);
+      showToast(`Circuit execution error: ${err instanceof Error ? err.message : 'Registration failed'}`, 'error');
+    }
   };
 
   return (
@@ -129,6 +141,7 @@ export function App() {
         isSyncing={isSyncing}
         onRefresh={handleRefresh}
         onOpenLaceModal={() => setIsLaceModalOpen(true)}
+        onDisconnectLace={handleDisconnectLace}
         isLaceConnected={isLaceConnected}
       />
 
@@ -137,6 +150,7 @@ export function App() {
         isOpen={isLaceModalOpen}
         onClose={() => setIsLaceModalOpen(false)}
         onConnectLace={handleConnectLace}
+        onDisconnectLace={handleDisconnectLace}
         connectedAddress={isLaceConnected ? walletAddress : ''}
       />
 
