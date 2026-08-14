@@ -102,7 +102,10 @@ describe('Charity Donation Tracker Compact Smart Contract', () => {
     };
 
     // Private witness must not appear in any on-chain state field
-    const serialized = JSON.stringify(onChainState);
+    // BigInt replacer: JSON.stringify cannot natively serialize BigInt values
+    const bigintReplacer = (_: string, v: unknown) =>
+      typeof v === 'bigint' ? v.toString() : v;
+    const serialized = JSON.stringify(onChainState, bigintReplacer);
     expect(serialized).not.toContain(donorSecret.toString());
     expect(onChainState).not.toHaveProperty('donorSecret');
   });
@@ -113,7 +116,9 @@ describe('Charity Donation Tracker Compact Smart Contract', () => {
     const publicOutputs = { disclosedAmount: 500n, activeCampaignTitle: 'Clean Water' };
 
     expect(publicOutputs).not.toHaveProperty('donorSecret');
-    expect(JSON.stringify(publicOutputs)).not.toContain(privateWitness.donorSecret);
+    const bigintReplacer = (_: string, v: unknown) =>
+      typeof v === 'bigint' ? v.toString() : v;
+    expect(JSON.stringify(publicOutputs, bigintReplacer)).not.toContain(privateWitness.donorSecret);
   });
 
   // --- State: Campaign Title Updates on Each createCampaign Call ---

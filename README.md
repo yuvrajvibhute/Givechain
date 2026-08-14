@@ -15,6 +15,14 @@ A decentralized, privacy-preserving charity donation platform built on the Midni
 
 ---
 
+## 🎥 Demo Video
+
+> A full walkthrough of the GiveChain dApp — Lace Wallet connection, anonymous donation ZK circuit execution, campaign creation, and live on-chain state updates on the Midnight Preprod Testnet.
+
+**📹 [`Screen Recording 2026-08-14 160705.mp4`](./Screen%20Recording%202026-08-14%20160705.mp4)**
+
+---
+
 ## 📦 Midnight SDK Packages & Integration
 
 GiveChain integrates the complete set of official `@midnight-ntwrk` SDK packages required for full dApp-to-blockchain communication:
