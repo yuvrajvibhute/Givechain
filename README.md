@@ -12,7 +12,7 @@ A decentralized, privacy-preserving charity donation platform built on the Midni
 - **Preprod Contract Address:** `020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d`
 - **Secondary Deployed Network:** Preview Testnet
 - **Preview Contract Address:** `ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a`
-- **Contract Source:** `contracts/hello-world.compact`
+- **Contract Source:** `contracts/charity_donation.compact`
 
 ---
 
