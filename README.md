@@ -7,7 +7,6 @@ A decentralized, privacy-preserving charity donation platform built on the Midni
 ## 🌐 Live Demo & Deployment Summary
 
 - **Live Demo URL:** [https://givechain-midnight.vercel.app](https://givechain-midnight.vercel.app)
-- ** 🎥 Demo Video[▶️ Watch Givechain Demo](./Screen%20Recording%202026-08-14%20160705.mp4)
 - **Primary Deployed Network:** **Preprod Testnet**
 - **Preprod Contract Address:** `020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d`
 - **Secondary Deployed Network:** Preview Testnet
