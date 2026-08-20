@@ -132,7 +132,7 @@ The pipeline runs on every `push` to `main` / `develop` and every `pull_request`
 ✅ Job 3: build       — npm run build:web (Vite production bundle)
 ```
 
-CI Badge: [![CI — GiveChain](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml)
+CI Badge: ([![GiveChain CI — Midnight ZK dApp](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml))
 
 ---
 
