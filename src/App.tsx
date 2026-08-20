@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Heart, Cpu, Wallet, Server, Shield, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Heart, Cpu, Wallet, Server, Shield, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { Header } from './components/Header';
 import { LedgerTab } from './components/LedgerTab';
 import { ProofVisualizerTab } from './components/ProofVisualizerTab';
 import { WalletTab } from './components/WalletTab';
 import { NetworkTab } from './components/NetworkTab';
+import { PrivacyModelTab } from './components/PrivacyModelTab';
 import { LaceWalletModal } from './components/LaceWalletModal';
 import { INITIAL_TRANSACTIONS, TransactionRecord } from './api';
 import { executeDonateCircuit, executeCreateCampaignCircuit, disconnectLaceWallet } from './dapp-connector';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'proof' | 'wallet' | 'network'>('ledger');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'proof' | 'wallet' | 'network' | 'privacy'>('ledger');
   const [activeNetwork, setActiveNetwork] = useState<string>('preprod');
   const [contractAddress] = useState<string>('020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d');
   const [walletAddress, setWalletAddress] = useState<string>('mn_addr_preprod1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
@@ -189,6 +190,14 @@ export function App() {
             <Server className="w-4 h-4 text-[#1F6E54]" />
             <span>Infrastructure Health</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('privacy')}
+            className={`nav-tab ${activeTab === 'privacy' ? 'active' : ''}`}
+          >
+            <Lock className="w-4 h-4 text-[#C85A32]" />
+            <span>Privacy Model</span>
+          </button>
         </div>
 
         {/* Tab Views */}
@@ -215,6 +224,8 @@ export function App() {
         )}
 
         {activeTab === 'network' && <NetworkTab activeNetwork={activeNetwork} />}
+
+        {activeTab === 'privacy' && <PrivacyModelTab />}
       </main>
 
       {/* Institutional Footer */}
