@@ -17,7 +17,6 @@ A decentralized, **privacy-preserving charity donation platform** built on the M
 |------|------|
 | **Live Demo** | [https://givechain-midnight.vercel.app](https://givechain-chi.vercel.app/) |
 | **Demo Video** | [`Screen Recording 2026-08-14 160705.mp4`](./Screen%20Recording%202026-08-14%20160705.mp4) |
-| **Preprod Contract** | `020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d` |
 | **Preview Contract** | `ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a` |
 | **Primary Network** | Midnight Preprod Testnet |
 | **Contract Source** | `contracts/charity_donation.compact` |
