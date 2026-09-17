@@ -5,6 +5,7 @@
 [![Midnight SDK](https://img.shields.io/badge/Midnight%20SDK-v4.1.1-blue)](https://docs.midnight.network)
 [![Network](https://img.shields.io/badge/Network-Preprod%20Testnet-purple)](https://midnight.network)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![X: @givechain1](https://img.shields.io/badge/X-%40givechain1-black?logo=x)](https://x.com/givechain1)
 
 A decentralized, **privacy-preserving charity donation platform** built on the Midnight Network using the Compact Zero-Knowledge (ZK) smart contract language and the full Midnight SDK stack. Donors can contribute to verified causes anonymously — their identity is mathematically shielded inside a ZK proof while the aggregate fund totals remain fully public and auditable.
 
@@ -20,6 +21,7 @@ A decentralized, **privacy-preserving charity donation platform** built on the M
 | **Preview Contract** | `ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a` |
 | **Primary Network** | Midnight Preprod Testnet |
 | **Contract Source** | `contracts/charity_donation.compact` |
+| **X (Twitter)** | [@givechain1](https://x.com/givechain1) |
 
 ---
 
