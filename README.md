@@ -1,13 +1,26 @@
 # GiveChain — Privacy-Preserving Charity Donation Tracker
 
 [![CI — GiveChain](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml)
-[![Tests: 8 Passing](https://img.shields.io/badge/tests-8%20passing-brightgreen)](https://github.com/yuvrajvibhute/yuvi/actions)
+[![Tests: 18 Passing](https://img.shields.io/badge/tests-18%20passing-brightgreen)](https://github.com/yuvrajvibhute/yuvi/actions)
 [![Midnight SDK](https://img.shields.io/badge/Midnight%20SDK-v4.1.1-blue)](https://docs.midnight.network)
 [![Network](https://img.shields.io/badge/Network-Preprod%20Testnet-purple)](https://midnight.network)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![X: @givechain1](https://img.shields.io/badge/X-%40givechain1-black?logo=x)](https://x.com/givechain1)
 
 A decentralized, **privacy-preserving charity donation platform** built on the Midnight Network using the Compact Zero-Knowledge (ZK) smart contract language and the full Midnight SDK stack. Donors can contribute to verified causes anonymously — their identity is mathematically shielded inside a ZK proof while the aggregate fund totals remain fully public and auditable.
+
+---
+
+## 🗓️ September 2026 Development Update
+
+Active development continued through September 2026 with the following major additions:
+
+| Feature | File(s) | Description |
+|---------|---------|-------------|
+| **ZK Witness Utilities** | `src/utils/zkUtils.ts` | Reusable `computeWitnessCommitment()`, `validateDonorSecret()`, `formatTxHash()`, `sanitizePublicOutputs()` extracted from the circuit execution pipeline for independent testability |
+| **Live Network Status Hook** | `src/hooks/useNetworkStatus.ts` | React hook polling Midnight node RPC every 30s with latency tracking, block height reporting, and graceful timeout handling |
+| **CSV / JSON Ledger Export** | `src/components/DonationHistoryExport.tsx` | Auditor utility enabling one-click CSV and JSON export of the full public on-chain donation ledger — no witness secrets included |
+| **Custom Donation Amount** | `src/components/LedgerTab.tsx` | Extended the donate modal with a validated free-text custom amount input, supporting any amount from \$1 to \$1,000,000 |
+| **Expanded Test Suite** | `tests/charity_donation.test.ts` | 4 new ZK utility test cases — commitment determinism, secret validation, tx hash formatting, output sanitization — bringing total to **18/18 passing** |
 
 ---
 
