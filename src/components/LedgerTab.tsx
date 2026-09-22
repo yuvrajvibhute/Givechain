@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, Plus, ShieldCheck, Lock, ArrowUpRight, Check, FileText, AlertCircle } from 'lucide-react';
 import { TransactionRecord, INITIAL_CAMPAIGNS, CharityCampaign } from '../api';
+import { DonationHistoryExport } from './DonationHistoryExport';
 
 interface LedgerTabProps {
   contractAddress: string;
@@ -20,6 +21,8 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const [campaigns, setCampaigns] = useState<CharityCampaign[]>(INITIAL_CAMPAIGNS);
   const [selectedCampaign, setSelectedCampaign] = useState<CharityCampaign | null>(null);
   const [donationAmount, setDonationAmount] = useState<number>(50);
+  const [customAmountInput, setCustomAmountInput] = useState<string>('');
+  const [customAmountError, setCustomAmountError] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -35,7 +38,23 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const handleOpenDonateModal = (campaign: CharityCampaign) => {
     setSelectedCampaign(campaign);
     setDonationAmount(50);
+    setCustomAmountInput('');
+    setCustomAmountError('');
     setIsModalOpen(true);
+  };
+
+  const handleCustomAmountChange = (raw: string) => {
+    setCustomAmountInput(raw);
+    const parsed = parseFloat(raw);
+    if (raw === '') { setCustomAmountError(''); return; }
+    if (isNaN(parsed) || parsed <= 0) {
+      setCustomAmountError('Amount must be greater than $0');
+    } else if (parsed > 1_000_000) {
+      setCustomAmountError('Amount cannot exceed $1,000,000');
+    } else {
+      setCustomAmountError('');
+      setDonationAmount(Math.round(parsed));
+    }
   };
 
   const handleConfirmDonation = async () => {
@@ -230,9 +249,9 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
             <h3 className="text-lg font-bold font-serif text-[#0D3B4C]">Public On-Chain Donation Ledger</h3>
             <p className="text-xs text-[#57656E]">Verifiable execution audit log of confirmed Compact circuit state transitions.</p>
           </div>
-          <span className="text-xs text-[#57656E] font-mono-num">
-            {transactions.length} Total Circuit Executions
-          </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <DonationHistoryExport transactions={transactions} />
+          </div>
         </div>
 
         {/* Ledger Table */}
@@ -310,14 +329,14 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-[#0D3B4C] mb-1.5">Donation Amount (USD)</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 mb-2">
                   {[25, 50, 100, 250].map((amt) => (
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => setDonationAmount(amt)}
+                      onClick={() => { setDonationAmount(amt); setCustomAmountInput(''); setCustomAmountError(''); }}
                       className={`flex-1 py-2 text-xs font-bold rounded-lg border transition ${
-                        donationAmount === amt
+                        donationAmount === amt && customAmountInput === ''
                           ? 'bg-[#0D3B4C] text-[#FFFFFF] border-[#0D3B4C]'
                           : 'bg-[#F7F5F0] text-[#0D3B4C] border-[#E0D9CD] hover:border-[#0D3B4C]'
                       }`}
@@ -325,6 +344,29 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
                       ${amt}
                     </button>
                   ))}
+                </div>
+                <div className="mt-1">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#57656E]">$</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000000}
+                      placeholder="Custom amount"
+                      value={customAmountInput}
+                      onChange={(e) => handleCustomAmountChange(e.target.value)}
+                      className={`w-full pl-7 pr-3 py-2 text-xs rounded-lg border bg-[#F7F5F0] text-[#0D3B4C] focus:outline-none transition ${
+                        customAmountError
+                          ? 'border-rose-400 focus:border-rose-500'
+                          : customAmountInput !== ''
+                          ? 'border-[#0D3B4C]'
+                          : 'border-[#E0D9CD] focus:border-[#0D3B4C]'
+                      }`}
+                    />
+                  </div>
+                  {customAmountError && (
+                    <p className="mt-1 text-[10px] text-rose-600 font-medium">{customAmountError}</p>
+                  )}
                 </div>
               </div>
 
