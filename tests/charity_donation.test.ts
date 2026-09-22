@@ -1,4 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import {
+  computeWitnessCommitment,
+  computeCommitmentFromBytes,
+  validateDonorSecret,
+  formatTxHash,
+  generateDemoSecret,
+  sanitizePublicOutputs,
+  COMMITMENT_HEX_LENGTH,
+  MIN_SECRET_LENGTH,
+} from '../src/utils/zkUtils';
 
 // ============================================================================
 // GIVECHAIN MIDNIGHT COMPACT CIRCUIT — COMPREHENSIVE TEST SUITE
@@ -188,5 +198,61 @@ describe('Charity Donation Tracker Compact Smart Contract', () => {
     totalDonations += largeAmount;
     expect(totalDonations).toBe(1_000_000n);
     expect(totalDonations > 0n).toBe(true);
+  });
+
+  // ── 15. ZK Utils: Witness Commitment Determinism ──────────────────────────
+  it('should produce identical witness commitments for the same donor secret input', async () => {
+    const secret = '0xdeadbeef1234567890abcdef';
+    const result1 = await computeWitnessCommitment(secret);
+    const result2 = await computeWitnessCommitment(secret);
+    expect(result1.commitment).toBe(result2.commitment);
+    expect(result1.commitment).toHaveLength(COMMITMENT_HEX_LENGTH);
+    expect(/^[0-9a-f]{64}$/.test(result1.commitment)).toBe(true);
+    const rawBytes = new TextEncoder().encode(secret);
+    const rawResult = await computeCommitmentFromBytes(rawBytes);
+    expect(rawResult).toBe(result1.commitment);
+  });
+
+  // ── 16. ZK Utils: Donor Secret Validation ────────────────────────────────
+  it('should validate donor secrets according to ZK circuit input rules', () => {
+    expect(validateDonorSecret('abc').isValid).toBe(false);
+    expect(validateDonorSecret('').isValid).toBe(false);
+    expect(validateDonorSecret('   ').isValid).toBe(false);
+    const atMin = 'a'.repeat(MIN_SECRET_LENGTH);
+    expect(validateDonorSecret(atMin).isValid).toBe(true);
+    expect(validateDonorSecret('0xdeadbeef1234').isValid).toBe(true);
+    expect(validateDonorSecret('0xGGGG1234').isValid).toBe(false);
+    const demo = generateDemoSecret();
+    expect(validateDonorSecret(demo).isValid).toBe(true);
+  });
+
+  // ── 17. ZK Utils: Transaction Hash Formatting ─────────────────────────────
+  it('should format full 32-byte tx hashes into display-safe abbreviated form', () => {
+    const fullHash = '0x9a4f2bc83de71f05a642b1dd8c3f4e591a7d89023bc4e567f98a1d0345e2c7b6';
+    const formatted = formatTxHash(fullHash);
+    expect(formatted.startsWith('0x')).toBe(true);
+    expect(formatted).toContain('...');
+    expect(formatted.length).toBeLessThan(fullHash.length);
+    const shortHash = '0x9a4f...e31b';
+    expect(formatTxHash(shortHash)).toBe(shortHash);
+    const noPrefixHash = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+    expect(formatTxHash(noPrefixHash).startsWith('0x')).toBe(true);
+  });
+
+  // ── 18. ZK Utils: Public Output Sanitization ─────────────────────────────
+  it('should sanitize BigInt public outputs to JSON-serializable strings', () => {
+    const rawOutputs = {
+      totalDonations: 12025n,
+      campaignCount: 3n,
+      activeCampaignTitle: 'Medical Relief',
+      blockHeight: 14892,
+    };
+    const sanitized = sanitizePublicOutputs(rawOutputs as Record<string, unknown>);
+    expect(sanitized.totalDonations).toBe('12025');
+    expect(sanitized.campaignCount).toBe('3');
+    expect(sanitized.activeCampaignTitle).toBe('Medical Relief');
+    expect(sanitized.blockHeight).toBe(14892);
+    expect(() => JSON.stringify(sanitized)).not.toThrow();
+    expect(sanitized).not.toHaveProperty('donorSecret');
   });
 });
