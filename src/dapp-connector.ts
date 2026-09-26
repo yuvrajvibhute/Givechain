@@ -543,7 +543,7 @@ export async function executeCreateCampaignCircuit(
   callerAddress: string = '',
   walletContext?: ConnectedAPI,
 ): Promise<CircuitExecutionResult> {
-  const activeWallet = walletContext || activeConnectedApi;
+  const activeWallet = walletContext || activeConnectedApi || undefined;
   const proofStart = performance.now();
 
   try {

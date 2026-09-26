@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Plus, ShieldCheck, Lock, ArrowUpRight, Check, FileText, AlertCircle, RefreshCw, Activity } from 'lucide-react';
 import { TransactionRecord, CharityCampaign } from '../api';
 import { DonationHistoryExport } from './DonationHistoryExport';

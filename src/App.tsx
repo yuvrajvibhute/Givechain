@@ -7,7 +7,7 @@ import { WalletTab } from './components/WalletTab';
 import { NetworkTab } from './components/NetworkTab';
 import { PrivacyModelTab } from './components/PrivacyModelTab';
 import { OneAmWalletModal } from './components/OneAmWalletModal';
-import { INITIAL_CAMPAIGNS, type TransactionRecord } from './api';
+import { INITIAL_CAMPAIGNS, type TransactionRecord, type CharityCampaign } from './api';
 import {
   executeDonateCircuit,
   executeCreateCampaignCircuit,
