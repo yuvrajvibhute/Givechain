@@ -47,13 +47,21 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
+  // Sync campaigns whenever updated by parent
+  useEffect(() => {
+    if (campaignsProp && campaignsProp.length > 0) {
+      setCampaigns(campaignsProp);
+    }
+  }, [campaignsProp]);
+
   // New Campaign Form State
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Humanitarian');
   const [newTarget, setNewTarget] = useState(10000);
 
-  // Use on-chain totalDonations as the real raised amount if available
-  const totalRaised = totalDonations > 0n ? Number(totalDonations) : campaigns.reduce((sum, c) => sum + (c.raisedAmount ?? 0), 0);
+  // Total raised calculated from on-chain totalDonations and local campaigns sum
+  const campaignSum = campaigns.reduce((sum, c) => sum + (c.raisedAmount ?? 0), 0);
+  const totalRaised = Math.max(Number(totalDonations), campaignSum);
   const totalGoal = campaigns.reduce((sum, c) => sum + (c.targetGoal ?? c.targetAmount ?? 10000), 0);
   const overallPercentage = totalGoal > 0 ? Math.min(Math.round((totalRaised / totalGoal) * 100), 100) : 0;
 
@@ -88,10 +96,28 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
 
     // Use a random hex secret as the donor witness (the real secret is generated client-side).
     const runtimeSecret = '0x' + Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const targetTitle = selectedCampaign.title;
+    const amount = donationAmount;
 
-    await onDonate(selectedCampaign.title, donationAmount, runtimeSecret);
-    // On-chain totalDonations updates via the useLiveContractState polling hook.
     setIsModalOpen(false);
+
+    try {
+      await onDonate(targetTitle, amount, runtimeSecret);
+      // Immediately reflect the donation in local campaigns list
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.title === targetTitle
+            ? {
+                ...c,
+                raisedAmount: (c.raisedAmount || 0) + amount,
+                donorCount: (c.donorCount || 0) + 1,
+              }
+            : c
+        )
+      );
+    } catch {
+      // Toast notification in onDonate handles error
+    }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {

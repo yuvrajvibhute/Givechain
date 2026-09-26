@@ -41,6 +41,11 @@ export function App() {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletContext, setWalletContext] = useState<ConnectedAPI | undefined>();
 
+  // Campaigns state initialized from default verified causes
+  const [campaigns, setCampaigns] = useState<CharityCampaign[]>(INITIAL_CAMPAIGNS);
+  // Immediate local donation sum ensuring funding metrics update without indexer lag
+  const [localDonationsTotal, setLocalDonationsTotal] = useState<bigint>(0n);
+
   // Local session transactions (from this browser session — merged with indexer history)
   const [localTransactions, setLocalTransactions] = useState<TransactionRecord[]>([]);
 
@@ -58,6 +63,9 @@ export function App() {
     lastUpdated,
     refresh: refreshState,
   } = useLiveContractState(CONTRACT_ADDRESS ?? null, activeNetwork);
+
+  // Effective donations combining on-chain indexer state and local confirmed donations
+  const effectiveTotalDonations = (totalDonations && totalDonations > 0n ? totalDonations : 0n) + localDonationsTotal;
 
   // ─── Real transaction history from indexer ─────────────────────────────────
   const {
@@ -178,12 +186,25 @@ export function App() {
   }, [walletContext]);
 
   // ─── 1AM Wallet connect / disconnect ──────────────────────────────────────
-  const handleConnectWallet = (newAddress: string, ctx?: ConnectedAPI) => {
+  const handleConnectWallet = (
+    newAddress: string,
+    ctx?: ConnectedAPI,
+    initialBalance?: string,
+    initialDust?: string,
+  ) => {
     setWalletAddress(newAddress);
     setIsWalletConnected(true);
     setWalletContext(ctx);
+    if (initialBalance !== undefined) {
+      setWalletBalance(initialBalance);
+    }
+    if (initialDust !== undefined) {
+      setDustBalance(initialDust);
+    }
     if (ctx) {
       void updateBalances(ctx);
+      setTimeout(() => updateBalances(ctx), 800);
+      setTimeout(() => updateBalances(ctx), 2500);
     }
     showToast(`1AM Wallet Connected! ${newAddress.slice(0, 14)}...`, 'success');
   };
@@ -205,7 +226,7 @@ export function App() {
       showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
       return;
     }
-    if (!isWalletConnected || !walletContext) {
+    if (!isWalletConnected) {
       showToast('Please connect your 1AM wallet before donating.', 'error');
       return;
     }
@@ -224,6 +245,31 @@ export function App() {
         walletContext,
       );
 
+      // 1. Immediately update campaign cards in local state
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.title === campaignTitle
+            ? {
+                ...c,
+                raisedAmount: (c.raisedAmount || 0) + amount,
+                donorCount: (c.donorCount || 0) + 1,
+              }
+            : c
+        )
+      );
+
+      // 2. Immediately update the total public funds raised on the ledger
+      setLocalDonationsTotal((prev) => prev + BigInt(amount));
+
+      // 3. Deduct from local wallet balance if numeric
+      setWalletBalance((prev) => {
+        const num = parseFloat(prev.replace(/,/g, ''));
+        if (!isNaN(num) && num >= amount) {
+          return (num - amount).toLocaleString(undefined, { maximumFractionDigits: 6 });
+        }
+        return prev;
+      });
+
       const newTx: TransactionRecord = {
         id: `tx-${Date.now()}`,
         txHash: result.txHash,
@@ -240,12 +286,18 @@ export function App() {
       setLocalTransactions((prev) => [newTx, ...prev]);
       setIsSubmitting(false);
       showToast(
-        `Donation confirmed! Tx: ${result.txHash.slice(0, 14)}... | Proof: ${result.proofTimeMs}ms`,
+        `Donated ${amount} tNIGHT to "${campaignTitle}"! Tx: ${result.txHash.slice(0, 14)}... | Proof: ${result.proofTimeMs}ms`,
         'success',
       );
 
       // Refresh on-chain state after confirmed tx.
-      setTimeout(() => { refreshState(); refreshTxs(); }, 5000);
+      setTimeout(() => {
+        refreshState();
+        refreshTxs();
+        if (walletContext) {
+          void updateBalances(walletContext);
+        }
+      }, 3000);
     } catch (err) {
       setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : 'Transaction failed';
@@ -265,7 +317,7 @@ export function App() {
       showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
       return;
     }
-    if (!isWalletConnected || !walletContext) {
+    if (!isWalletConnected) {
       showToast('Please connect your 1AM wallet to create campaigns.', 'error');
       return;
     }
@@ -285,6 +337,22 @@ export function App() {
         walletContext,
       );
 
+      const newCause: CharityCampaign = {
+        id: `camp-${Date.now()}`,
+        title,
+        category: _category,
+        raisedAmount: 0,
+        targetGoal: _targetAmount,
+        targetAmount: _targetAmount,
+        donorCount: 0,
+        description: 'Community registered charity initiative on Midnight Network.',
+        organizationName: 'Verified Non-Profit',
+        organizerAddress: walletAddress || 'mn_addr_preview10ycqu37m0s3dez84f3qqm7sgkx4dwk803nqwutv4y5c37qa0r54s2tkxpk',
+        verifiedStatus: true,
+      };
+
+      setCampaigns((prev) => [newCause, ...prev]);
+
       const newTx: TransactionRecord = {
         id: `tx-${Date.now()}`,
         txHash: result.txHash,
@@ -302,7 +370,7 @@ export function App() {
       setIsSubmitting(false);
       showToast(`Campaign "${title}" registered on Midnight! Tx: ${result.txHash.slice(0, 14)}...`, 'success');
 
-      setTimeout(() => { refreshState(); refreshTxs(); }, 5000);
+      setTimeout(() => { refreshState(); refreshTxs(); }, 3000);
     } catch (err) {
       setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : 'Registration failed';
@@ -389,14 +457,14 @@ export function App() {
           <LedgerTab
             contractAddress={CONTRACT_ADDRESS ?? '(not configured — set VITE_CONTRACT_ADDRESS)'}
             transactions={transactions}
-            campaigns={INITIAL_CAMPAIGNS}
+            campaigns={campaigns}
             onDonate={handleDonate}
             onCreateCampaign={handleCreateCampaign}
             isSubmitting={isSubmitting}
             // Live on-chain state props
-            totalDonations={totalDonations}
-            campaignCount={campaignCount}
-            activeCampaignTitle={activeCampaignTitle}
+            totalDonations={effectiveTotalDonations}
+            campaignCount={campaignCount > BigInt(campaigns.length) ? campaignCount : BigInt(campaigns.length)}
+            activeCampaignTitle={activeCampaignTitle || (campaigns[0]?.title ?? '')}
             stateLoading={stateLoading || txLoading}
             stateError={stateError}
             lastUpdated={lastUpdated}

@@ -13,7 +13,12 @@ import {
 interface OneAmWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConnectWallet: (address: string, ctx?: ConnectedAPI) => void;
+  onConnectWallet: (
+    address: string,
+    ctx?: ConnectedAPI,
+    initialBalance?: string,
+    initialDust?: string,
+  ) => void;
   onDisconnectWallet: () => void;
   connectedAddress: string;
   activeNetwork?: string;
@@ -56,7 +61,12 @@ export const OneAmWalletModal: React.FC<OneAmWalletModalProps> = ({
     setIsConnecting(false);
 
     if (result.connected && result.address) {
-      onConnectWallet(result.address, result.walletContext);
+      onConnectWallet(
+        result.address,
+        result.walletContext,
+        result.walletBalance,
+        result.dustBalance,
+      );
       if (result.error) {
         setErrorMsg(result.error);
       } else {
