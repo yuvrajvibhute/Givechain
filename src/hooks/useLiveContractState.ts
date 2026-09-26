@@ -79,26 +79,17 @@ export function useLiveContractState(
     };
   }, []);
 
-  useEffect(() => {
-    if (!contractAddress) {
-      setLoading(false);
-      setError('No contract address configured. Set VITE_CONTRACT_ADDRESS in .env');
-      return;
-    }
+  const targetAddress = contractAddress || '7715b2ade8a1143196d232dd26ac732aef83a390503bf7d308d2d4bf741294b9';
 
+  useEffect(() => {
     let timerId: ReturnType<typeof setTimeout>;
 
     async function fetchState() {
       try {
-        const raw = await queryIndexerContractState(networkConfig.indexerUrl, contractAddress!);
+        const raw = await queryIndexerContractState(networkConfig.indexerUrl, targetAddress);
         if (!isMounted.current) return;
 
         if (!raw) {
-          setError(
-            `Contract not found in indexer (${networkId}). ` +
-            `Verify the contract is deployed and indexed at ${contractAddress}.\n` +
-            `Confirmed live on Preview: ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a`,
-          );
           setLoading(false);
           return;
         }

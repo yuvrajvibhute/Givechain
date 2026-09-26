@@ -47,8 +47,8 @@ export const WalletTab: React.FC<WalletTabProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="report-card p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#57656E] uppercase tracking-wider">Unshielded Native Balance</span>
-            <span className="verified-badge">tNIGHT</span>
+            <span className="text-xs font-semibold text-[#57656E] uppercase tracking-wider">Native Token Balance</span>
+            <span className="verified-badge">tNIGHT (Shielded & Public)</span>
           </div>
 
           <div>

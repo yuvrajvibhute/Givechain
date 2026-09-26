@@ -19,9 +19,12 @@ import { useLiveContractState } from './hooks/useLiveContractState';
 import { useTransactionHistory } from './hooks/useTransactionHistory';
 
 // ─── Contract address ─────────────────────────────────────────────────────────
-// Loaded from the VITE_CONTRACT_ADDRESS environment variable (set in .env after deployment).
-// If not set, the UI will display an "unconfigured" warning in the ledger tab.
-const CONTRACT_ADDRESS = (import.meta as any).env?.VITE_CONTRACT_ADDRESS as string | undefined;
+// Deployed Preview testnet contract address (fallback ensures live indexer connectivity even if env var is missing)
+export const DEPLOYED_CONTRACT_ADDRESS = '7715b2ade8a1143196d232dd26ac732aef83a390503bf7d308d2d4bf741294b9';
+
+const CONTRACT_ADDRESS =
+  (import.meta as any).env?.VITE_CONTRACT_ADDRESS ||
+  DEPLOYED_CONTRACT_ADDRESS;
 
 // Active network defaults to 'preview'. Users can switch via the Header network selector.
 const DEFAULT_NETWORK = ((import.meta as any).env?.VITE_NETWORK as string | undefined) ?? 'preview';
@@ -30,8 +33,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'ledger' | 'proof' | 'wallet' | 'network' | 'privacy'>('ledger');
   const [activeNetwork, setActiveNetwork] = useState<string>(DEFAULT_NETWORK);
   const [walletAddress, setWalletAddress] = useState<string>('');
-  const [walletBalance] = useState<string>('—');
-  const [dustBalance] = useState<string>('—');
+  const [walletBalance, setWalletBalance] = useState<string>('—');
+  const [dustBalance, setDustBalance] = useState<string>('—');
 
   // 1AM Wallet connection state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -78,6 +81,9 @@ export function App() {
     showToast('Syncing with Midnight Network indexer...', 'info');
     refreshState();
     refreshTxs();
+    if (walletContext) {
+      void updateBalances(walletContext);
+    }
     await new Promise((r) => setTimeout(r, 1200));
     setIsSyncing(false);
     showToast(lastUpdated ? `Synced at ${new Date(lastUpdated).toLocaleTimeString()}` : 'Sync complete', 'success');
@@ -89,11 +95,96 @@ export function App() {
     showToast(`Switched to ${net.toUpperCase()}`, 'info');
   };
 
+  // ─── 1AM Wallet Balance Fetcher ───────────────────────────────────────────
+  const updateBalances = useCallback(async (ctx?: ConnectedAPI) => {
+    const activeApi = ctx || walletContext;
+    if (!activeApi) return;
+    try {
+      let unshieldedTotal = 0n;
+      let shieldedTotal = 0n;
+      let foundTokens = false;
+
+      // 1. Fetch unshielded balances (public tNIGHT / custom tokens)
+      if (typeof activeApi.getUnshieldedBalances === 'function') {
+        try {
+          const unshielded = await activeApi.getUnshieldedBalances();
+          if (unshielded && typeof unshielded === 'object') {
+            for (const val of Object.values(unshielded)) {
+              if (typeof val === 'bigint') {
+                unshieldedTotal += val;
+                foundTokens = true;
+              } else if (typeof val === 'number' || typeof val === 'string') {
+                unshieldedTotal += BigInt(val);
+                foundTokens = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error fetching unshielded balances from 1AM Wallet:', e);
+        }
+      }
+
+      // 2. Fetch shielded balances (ZK private tNIGHT / shielded tokens)
+      if (typeof activeApi.getShieldedBalances === 'function') {
+        try {
+          const shielded = await activeApi.getShieldedBalances();
+          if (shielded && typeof shielded === 'object') {
+            for (const val of Object.values(shielded)) {
+              if (typeof val === 'bigint') {
+                shieldedTotal += val;
+                foundTokens = true;
+              } else if (typeof val === 'number' || typeof val === 'string') {
+                shieldedTotal += BigInt(val);
+                foundTokens = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error fetching shielded balances from 1AM Wallet:', e);
+        }
+      }
+
+      const totalTokens = unshieldedTotal + shieldedTotal;
+      if (foundTokens) {
+        // Midnight testnet token: 1 tNIGHT = 1,000,000 smallest units
+        const displayVal = totalTokens >= 1_000_000n
+          ? (Number(totalTokens) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })
+          : totalTokens.toLocaleString();
+        setWalletBalance(displayVal);
+      } else {
+        setWalletBalance('0');
+      }
+
+      // 3. Fetch DUST balance (Midnight bandwidth gas resource)
+      if (typeof activeApi.getDustBalance === 'function') {
+        try {
+          const dust = await activeApi.getDustBalance();
+          if (dust && (typeof dust.balance === 'bigint' || typeof dust.balance === 'number' || typeof dust.balance === 'string')) {
+            const dustVal = BigInt(dust.balance);
+            const displayDust = dustVal >= 1_000_000n
+              ? (Number(dustVal) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 4 })
+              : dustVal.toLocaleString();
+            setDustBalance(displayDust);
+          } else {
+            setDustBalance('0');
+          }
+        } catch (e) {
+          console.warn('Error fetching dust balance from 1AM Wallet:', e);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query 1AM wallet balances:', err);
+    }
+  }, [walletContext]);
+
   // ─── 1AM Wallet connect / disconnect ──────────────────────────────────────
   const handleConnectWallet = (newAddress: string, ctx?: ConnectedAPI) => {
     setWalletAddress(newAddress);
     setIsWalletConnected(true);
     setWalletContext(ctx);
+    if (ctx) {
+      void updateBalances(ctx);
+    }
     showToast(`1AM Wallet Connected! ${newAddress.slice(0, 14)}...`, 'success');
   };
 
@@ -103,6 +194,8 @@ export function App() {
     setIsWalletConnected(false);
     setWalletContext(undefined);
     setWalletAddress('');
+    setWalletBalance('—');
+    setDustBalance('—');
     showToast('1AM Wallet Disconnected.', 'info');
   };
 
