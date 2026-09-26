@@ -124,8 +124,15 @@ export function useNetworkStatus(networkId: string = 'preprod'): NetworkStatus {
   // Kick off on mount and whenever the networkId changes
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Immediate first poll
     void poll();
-    intervalRef.current = setInterval(() => { void poll(); }, POLL_INTERVAL_MS);
+
+    // Recurring poll every 30s
+    intervalRef.current = setInterval(() => {
+      void poll();
+    }, POLL_INTERVAL_MS);
+
     return () => {
       isMountedRef.current = false;
       if (intervalRef.current !== null) {
@@ -135,5 +142,13 @@ export function useNetworkStatus(networkId: string = 'preprod'): NetworkStatus {
     };
   }, [poll]);
 
-  return { isHealthy, blockHeight, latencyMs, lastChecked, isPolling, error, refresh: poll };
+  return {
+    isHealthy,
+    blockHeight,
+    latencyMs,
+    lastChecked,
+    isPolling,
+    error,
+    refresh: poll,
+  };
 }

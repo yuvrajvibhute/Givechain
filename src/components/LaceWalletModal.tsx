@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, ExternalLink, X, AlertCircle, RefreshCw, Lock, Sparkles, LogOut } from 'lucide-react';
-import { connectLaceWallet, disconnectLaceWallet, isLaceExtensionAvailable } from '../dapp-connector';
+import { connectLaceWallet, disconnectLaceWallet, isLaceExtensionAvailable, type DAppConnectorWalletAPI } from '../dapp-connector';
 
 interface LaceWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConnectLace: (address: string) => void;
+  /** Called with address and the Lace wallet context (needed for real callTx). */
+  onConnectLace: (address: string, ctx?: DAppConnectorWalletAPI) => void;
   onDisconnectLace: () => void;
   connectedAddress: string;
 }
@@ -41,14 +42,14 @@ export const LaceWalletModal: React.FC<LaceWalletModalProps> = ({
     setIsConnecting(false);
 
     if (result.connected && result.address) {
-      onConnectLace(result.address);
+      onConnectLace(result.address, result.walletContext);
       if (result.error) {
         setErrorMsg(result.error);
       } else {
         onClose();
       }
     } else {
-      setErrorMsg(result.error || 'Failed to connect to Lace Wallet. Connection rejected or timed out.');
+      setErrorMsg(result.error || 'Failed to connect to Lace Wallet. Install Lace and enable the Midnight feature.');
     }
   };
 

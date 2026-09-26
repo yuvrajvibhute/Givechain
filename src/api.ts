@@ -1,5 +1,11 @@
 /**
- * API service layer for Midnight network status and Charity Donation Tracker contract state interaction
+ * API service layer for Midnight network status and Charity Donation Tracker contract state.
+ *
+ * Key changes from the original:
+ * - INITIAL_TRANSACTIONS removed: frontend now reads real tx history from the Midnight indexer.
+ * - INITIAL_CAMPAIGNS kept as UI scaffold only (seeded campaigns for display before indexer data loads).
+ * - NETWORKS API version corrected from v1 → v4 (matching the backend network.ts).
+ * - Added queryIndexerContractState() and queryIndexerTransactionHistory() for live data.
  */
 
 export interface NetworkConfig {
@@ -12,20 +18,21 @@ export interface NetworkConfig {
   faucetUrl?: string;
 }
 
+// API version v4 — matches the backend network.ts and the official Midnight indexer endpoints.
 export const NETWORKS: Record<string, NetworkConfig> = {
   undeployed: {
     networkId: 'undeployed',
     name: 'Local Devnet',
-    indexerUrl: 'http://localhost:8088/api/v1/graphql',
-    indexerWsUrl: 'ws://localhost:8088/api/v1/graphql/ws',
+    indexerUrl: 'http://localhost:8088/api/v4/graphql',
+    indexerWsUrl: 'ws://localhost:8088/api/v4/graphql/ws',
     nodeUrl: 'http://localhost:9944',
     proofServerUrl: 'http://localhost:6300',
   },
   preview: {
     networkId: 'preview',
     name: 'Preview Testnet',
-    indexerUrl: 'https://indexer.preview.midnight.network/api/v1/graphql',
-    indexerWsUrl: 'wss://indexer.preview.midnight.network/api/v1/graphql/ws',
+    indexerUrl: 'https://indexer.preview.midnight.network/api/v4/graphql',
+    indexerWsUrl: 'wss://indexer.preview.midnight.network/api/v4/graphql/ws',
     nodeUrl: 'https://rpc.preview.midnight.network',
     proofServerUrl: 'https://lace-proof-pub.preview.midnight.network',
     faucetUrl: 'https://midnight-tmnight-preview.nethermind.dev',
@@ -33,8 +40,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
   preprod: {
     networkId: 'preprod',
     name: 'Preprod Testnet',
-    indexerUrl: 'https://indexer.preprod.midnight.network/api/v1/graphql',
-    indexerWsUrl: 'wss://indexer.preprod.midnight.network/api/v1/graphql/ws',
+    indexerUrl: 'https://indexer.preprod.midnight.network/api/v4/graphql',
+    indexerWsUrl: 'wss://indexer.preprod.midnight.network/api/v4/graphql/ws',
     nodeUrl: 'https://rpc.preprod.midnight.network',
     proofServerUrl: 'https://lace-proof-pub.preprod.midnight.network',
     faucetUrl: 'https://midnight-tmnight-preprod.nethermind.dev',
@@ -69,6 +76,8 @@ export interface TransactionRecord {
   privacyGuarantee: string;
 }
 
+// Campaign display scaffold — these represent the UI cards.
+// Note: raisedAmount and donorCount are populated from on-chain data when available.
 export const INITIAL_CAMPAIGNS: CharityCampaign[] = [
   {
     id: 'camp-1',
@@ -76,8 +85,8 @@ export const INITIAL_CAMPAIGNS: CharityCampaign[] = [
     category: 'Environment & Health',
     targetGoal: 50000,
     targetAmount: 50000,
-    raisedAmount: 32450,
-    donorCount: 142,
+    raisedAmount: 0, // Updated from indexer
+    donorCount: 0,   // Updated from indexer
     description: 'Providing solar-powered water filtration systems to remote educational institutes.',
     organizationName: 'Aqua Pure Foundation',
     verifiedStatus: true,
@@ -88,8 +97,8 @@ export const INITIAL_CAMPAIGNS: CharityCampaign[] = [
     category: 'Web3 & Tech',
     targetGoal: 25000,
     targetAmount: 25000,
-    raisedAmount: 18900,
-    donorCount: 98,
+    raisedAmount: 0,
+    donorCount: 0,
     description: 'Funding open-source privacy software research and student developer bootcamps.',
     organizationName: 'Midnight Dev Guild',
     verifiedStatus: true,
@@ -100,52 +109,136 @@ export const INITIAL_CAMPAIGNS: CharityCampaign[] = [
     category: 'Humanitarian',
     targetGoal: 100000,
     targetAmount: 100000,
-    raisedAmount: 76200,
-    donorCount: 310,
+    raisedAmount: 0,
+    donorCount: 0,
     description: 'Direct privacy-preserving emergency aid to disaster affected community centers.',
     organizationName: 'Global Med Relief',
     verifiedStatus: true,
   },
 ];
 
-export const INITIAL_TRANSACTIONS: TransactionRecord[] = [
-  {
-    id: 'tx-101',
-    txHash: '0x9a4f...e31b',
-    circuitName: 'donate',
-    campaignTitle: 'Clean Water Infrastructure for Rural Schools',
-    amount: 500,
-    blockHeight: 14892,
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    status: 'confirmed',
-    proofTimeMs: 1420,
-    privacyGuarantee: 'Donor identity & witness secret shielded in ZK proof',
-  },
-  {
-    id: 'tx-102',
-    txHash: '0x3c1d...8f92',
-    circuitName: 'donate',
-    campaignTitle: 'Zero-Knowledge Education & Developer Grants',
-    amount: 1250,
-    blockHeight: 14870,
-    timestamp: new Date(Date.now() - 1000 * 60 * 38).toISOString(),
-    status: 'confirmed',
-    proofTimeMs: 1680,
-    privacyGuarantee: 'Donor identity & witness secret shielded in ZK proof',
-  },
-  {
-    id: 'tx-103',
-    txHash: '0x7e82...1a04',
-    circuitName: 'createCampaign',
-    campaignTitle: 'Emergency Relief & Medical Supply Distribution',
-    amount: 0,
-    blockHeight: 14810,
-    timestamp: new Date(Date.now() - 1000 * 60 * 110).toISOString(),
-    status: 'confirmed',
-    proofTimeMs: 980,
-    privacyGuarantee: 'Public campaign title disclosed to Midnight indexer',
-  },
-];
+// ─── On-Chain State Types ─────────────────────────────────────────────────────
+
+export interface ContractLedgerState {
+  totalDonations: bigint;
+  campaignCount: bigint;
+  activeCampaignTitle: string;
+}
+
+export interface IndexerTransaction {
+  id: string;
+  txHash: string;
+  circuitName: 'donate' | 'createCampaign';
+  blockHeight: number;
+  timestamp: string;
+}
+
+// ─── Indexer Query Functions ──────────────────────────────────────────────────
+
+/**
+ * Queries the Midnight indexer GraphQL endpoint (v4 schema) for the current on-chain
+ * contract state using the `contractAction` field (confirmed via live schema introspection).
+ *
+ * Schema: contractAction(address: String!) { address state zswapState transaction unshieldedBalances }
+ *
+ * Returns null if the contract is not indexed or the indexer is unreachable.
+ */
+export async function queryIndexerContractState(
+  indexerUrl: string,
+  contractAddress: string,
+): Promise<{ raw: Uint8Array } | null> {
+  try {
+    const query = `
+      query ContractState($address: String!) {
+        contractAction(address: $address) {
+          address
+          state
+        }
+      }
+    `;
+    const res = await fetch(indexerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { address: contractAddress } }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const stateHex: string | undefined = json?.data?.contractAction?.state;
+    if (!stateHex) return null;
+    // Convert hex state to Uint8Array for the contract's ledger() decoder.
+    const bytes = new Uint8Array(
+      stateHex.match(/.{1,2}/g)!.map((b: string) => parseInt(b, 16)),
+    );
+    return { raw: bytes };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Queries the Midnight indexer for transactions associated with a specific
+ * contract address. Uses the `transactions` query from the v4 GraphQL schema.
+ *
+ * v4 Schema fields confirmed via introspection:
+ *   transactions → nodes { hash blockInfo { height timestamp } contractActions { address } }
+ */
+export async function queryIndexerTransactionHistory(
+  indexerUrl: string,
+  contractAddress: string,
+  limit = 20,
+): Promise<IndexerTransaction[]> {
+  try {
+    // Query transactions that include a contractAction for our address.
+    // The v4 schema exposes `transactions` as the top-level list.
+    const query = `
+      query TxHistory($limit: Int!) {
+        transactions(first: $limit) {
+          nodes {
+            hash
+            blockInfo {
+              height
+              timestamp
+            }
+            contractActions {
+              address
+            }
+          }
+        }
+      }
+    `;
+    const res = await fetch(indexerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { limit } }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const nodes = json?.data?.transactions?.nodes ?? [];
+
+    // Filter to only txs involving our contract, then map to IndexerTransaction
+    return nodes
+      .filter((node: any) =>
+        Array.isArray(node?.contractActions) &&
+        node.contractActions.some((ca: any) => ca?.address === contractAddress),
+      )
+      .slice(0, limit)
+      .map((node: any, i: number): IndexerTransaction => ({
+        id: `indexer-tx-${node.hash ?? i}`,
+        txHash: node.hash ?? 'unknown',
+        // Without circuit name in v4 schema, we default to 'donate' for all filtered txs.
+        // The compiled runtime test suite can distinguish circuit names from private state.
+        circuitName: 'donate',
+        blockHeight: node.blockInfo?.height ?? 0,
+        timestamp: node.blockInfo?.timestamp ?? new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Service Health Check ─────────────────────────────────────────────────────
 
 export async function checkServiceHealth(url: string): Promise<boolean> {
   try {

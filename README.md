@@ -1,7 +1,7 @@
 # GiveChain — Privacy-Preserving Charity Donation Tracker
 
-[![CI — GiveChain](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/yuvi/actions/workflows/ci.yml)
-[![Tests: 18 Passing](https://img.shields.io/badge/tests-18%20passing-brightgreen)](https://github.com/yuvrajvibhute/yuvi/actions)
+[![CI — GiveChain](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml)
+[![Tests: 18 Passing](https://img.shields.io/badge/tests-18%20passing-brightgreen)](https://github.com/yuvrajvibhute/Givechain/actions)
 [![Midnight SDK](https://img.shields.io/badge/Midnight%20SDK-v4.1.1-blue)](https://docs.midnight.network)
 [![Network](https://img.shields.io/badge/Network-Preprod%20Testnet-purple)](https://midnight.network)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -10,17 +10,23 @@ A decentralized, **privacy-preserving charity donation platform** built on the M
 
 ---
 
-## 🗓️ September 2026 Development Update
+## 🗓️ September 2026 Production Update
 
-Active development continued through September 2026 with the following major additions:
+Major production-grade overhaul completed in September 2026. All fake transaction stubs, hardcoded state, and placeholder hashes have been replaced with the real Midnight.js SDK transaction path.
 
-| Feature | File(s) | Description |
-|---------|---------|-------------|
-| **ZK Witness Utilities** | `src/utils/zkUtils.ts` | Reusable `computeWitnessCommitment()`, `validateDonorSecret()`, `formatTxHash()`, `sanitizePublicOutputs()` extracted from the circuit execution pipeline for independent testability |
-| **Live Network Status Hook** | `src/hooks/useNetworkStatus.ts` | React hook polling Midnight node RPC every 30s with latency tracking, block height reporting, and graceful timeout handling |
-| **CSV / JSON Ledger Export** | `src/components/DonationHistoryExport.tsx` | Auditor utility enabling one-click CSV and JSON export of the full public on-chain donation ledger — no witness secrets included |
-| **Custom Donation Amount** | `src/components/LedgerTab.tsx` | Extended the donate modal with a validated free-text custom amount input, supporting any amount from \$1 to \$1,000,000 |
-| **Expanded Test Suite** | `tests/charity_donation.test.ts` | 4 new ZK utility test cases — commitment determinism, secret validation, tx hash formatting, output sanitization — bringing total to **18/18 passing** |
+### Changes Shipped
+
+| Area | What Changed |
+|------|-------------|
+| **Compact Contract** | Added nullifier replay prevention (`usedNullifiers` map), campaign authorization (`authorizedOrganizer`), and `initialize()` circuit |
+| **Deploy Script** | Now targets `charity_donation.compact` → `contracts/managed/charity-donation/`; calls `initialize()` post-deploy |
+| **Real Transactions** | `MidnightNetworkProviderService` (fake SHA-256 stub) removed; replaced with `callTx.donate()` / `callTx.createCampaign()` via `findDeployedContract` |
+| **Frontend State** | `INITIAL_TRANSACTIONS` static data removed; `useLiveContractState` + `useTransactionHistory` hooks poll Midnight indexer every 15s |
+| **Contract Address** | `VITE_CONTRACT_ADDRESS` loaded from `.env` (set after deployment); no hardcoded address in code |
+| **E2E Check** | `scripts/e2e-check.ts` reconnects to `charity-donation`, decodes and asserts all three ledger fields |
+| **Preprod E2E Test** | `scripts/e2e-preprod.ts` — full real donation: wallet → ZK proof → Preprod → indexer → assert `totalDonations` changed |
+| **CI Pipeline** | Added `compile-contract` job; test jobs download compiled artifacts; runtime tests run compiled circuit logic |
+| **API Version** | Corrected from v1 → v4 throughout (matches Midnight indexer endpoint) |
 
 ---
 
@@ -28,57 +34,57 @@ Active development continued through September 2026 with the following major add
 
 | Item | Link |
 |------|------|
-| **Live Demo** | [https://givechain-midnight.vercel.app](https://givechain-chi.vercel.app/) |
+| **Live Demo** | [https://givechain-midnight.vercel.app](https://givechain-midnight.vercel.app) |
 | **Demo Video** | [`Screen Recording 2026-08-14 160705.mp4`](./Screen%20Recording%202026-08-14%20160705.mp4) |
-| **Preview Contract** | `ee11e106e89fd0897ec108693963e0be0cdae8f41ae10e16afd63173fdbb7a9a` |
-| **Primary Network** | Midnight Preprod Testnet |
+| **Primary Network** | Midnight Preview Testnet |
 | **Contract Source** | `contracts/charity_donation.compact` |
-| **X (Twitter)** | [@givechain1](https://x.com/givechain1) |
+| **Deployed Preview Contract** | `7715b2ade8a1143196d232dd26ac732aef83a390503bf7d308d2d4bf741294b9` |
 
----
-
-## 🎥 Demo Video
-
-> A full walkthrough of the GiveChain dApp — Lace Wallet connection, anonymous donation ZK circuit execution, campaign creation, and live on-chain state updates on the Midnight Preprod Testnet.
-
-**📹 [`Screen Recording 2026-08-14 160705.mp4`](./Screen%20Recording%202026-08-14%20160705.mp4)**
+> [!NOTE]
+> **Deployed Contract Address**
+> The `charity_donation` smart contract (with cryptographic nullifiers, replay prevention, and organizer authorization) is deployed on **Midnight Preview Testnet** at:
+> `7715b2ade8a1143196d232dd26ac732aef83a390503bf7d308d2d4bf741294b9`
+>
+> Recorded in `.midnight-state.json` and set as `VITE_CONTRACT_ADDRESS` in `.env`.
+>
+> The address previously listed as "Preprod" (`020050ae...`) was queried against both Preprod and Preview indexers and returned `null` on both — it does not correspond to a live on-chain contract.
+>
+> After running `npm run deploy`, the new address is saved to `.midnight-state.json` and should be set as `VITE_CONTRACT_ADDRESS` in `.env`.
 
 ---
 
 ## 🛡️ Privacy Model — What an Observer Can and Cannot Learn
 
-This section explains the **public/private split** that Midnight's ZK infrastructure enforces for GiveChain.
-
 ### ✅ What a Blockchain Observer CAN Learn (Public Ledger State)
 
 | Observable | Source | Description |
 |------------|--------|-------------|
-| `totalDonations` | On-chain ledger | Total amount raised across all campaigns |
-| `campaignCount` | On-chain ledger | Number of registered charity initiatives |
+| `totalDonations` | On-chain ledger | Total tNIGHT raised across all campaigns |
+| `campaignCount` | On-chain ledger | Number of registered charity campaigns |
 | `activeCampaignTitle` | On-chain ledger | Title of the most recently registered campaign |
-| Transaction existence | Block explorer | That a donation circuit was executed (but not by whom) |
-| Proof validity | ZK verifier | That the proof is mathematically valid and the donor meets the constraint `amount > 0` |
+| `authorizedOrganizer` | On-chain ledger | Bech32 address of the authorized campaign creator |
+| Nullifier hash | On-chain ledger map | `sha3_256(donorSecret)` — confirms a donation happened (not WHO donated) |
+| Transaction existence | Block explorer | That a circuit was executed |
+| Proof validity | ZK verifier | That the proof is mathematically valid |
 
 ### 🚫 What a Blockchain Observer CANNOT Learn (Private/Shielded Data)
 
 | Shielded | Why It's Private | Compact Mechanism |
 |----------|-----------------|-------------------|
-| Donor wallet address | Not part of the public circuit output | `donorSecret` is a private witness — never passed to `disclose()` |
-| Individual donation amount | Only the aggregate `totalDonations` is updated | `amount` is disclosed but not linked to any identity |
-| `donorSecret` (Bytes<32>) | Off-chain ZK witness key — never leaves client | Private circuit input, shielded from ledger |
-| `donorNote` | Private message field — not disclosed | Not submitted to the on-chain state |
-| Donor linkability | Multiple donations cannot be linked to one person | No identity commitment recorded on-chain |
+| `donorSecret` (Bytes<32>) | Never passed to `disclose()` — only its sha3_256 hash is stored | Private circuit witness |
+| Donor wallet address | Not part of the circuit's public output | Midnight shielded transaction |
+| Individual donation amount | Only the cumulative `totalDonations` is public | `amount` disclosed to ledger, not linked to identity |
+| Donor linkability | Same donor with different secrets cannot be linked | Each nullifier is independent |
 
 ### 🔒 Zero-Knowledge Guarantee
 
 The `donate(donorSecret, amount)` circuit proves:
 - The donor holds a valid 32-byte secret witness key
 - The donation amount satisfies `assert(amount > 0)`
+- The nullifier `sha3_256(donorSecret)` has not been used before (replay prevention)
 - The public ledger state transition `totalDonations += amount` is correct
 
-**Without revealing:** who donated, their wallet address, their individual amount, or their `donorSecret`.
-
-This is enforced at the Compact language level — `donorSecret` is never passed to `disclose()` and therefore cannot appear in the public ledger state by design.
+**Without revealing:** who donated, their wallet address, individual amount, or `donorSecret`.
 
 ---
 
@@ -91,46 +97,53 @@ pragma language_version >= 0.23;
 import CompactStandardLibrary;
 
 // ── PUBLIC LEDGER STATE ────────────────────────────────────────────────────────
-export ledger totalDonations: Uint<64>;      // Total anonymous funds raised
-export ledger campaignCount: Uint<64>;       // Number of active campaigns
-export ledger activeCampaignTitle: Opaque<"string">; // Latest public campaign
+export ledger totalDonations: Uint<64>;
+export ledger campaignCount: Uint<64>;
+export ledger activeCampaignTitle: Opaque<"string">;
+export ledger authorizedOrganizer: Opaque<"string">;
+export ledger usedNullifiers: Map<Bytes<32>, Boolean>;
 
-// ── CIRCUIT: Create Charity Campaign ─────────────────────────────────────────
-export circuit createCampaign(title: Opaque<"string">): [] {
-    activeCampaignTitle = disclose(title);   // Public: campaign name on-chain
+// ── CIRCUIT: Initialize (set authorized organizer, call once at deploy) ────────
+export circuit initialize(organizer: Opaque<"string">): [] {
+    assert(authorizedOrganizer == "", "Contract already initialized");
+    authorizedOrganizer = disclose(organizer);
+}
+
+// ── CIRCUIT: Create Charity Campaign (organizer only) ─────────────────────────
+export circuit createCampaign(title: Opaque<"string">, callerAddress: Opaque<"string">): [] {
+    const disclosedCaller = disclose(callerAddress);
+    assert(disclosedCaller == authorizedOrganizer, "Unauthorized: caller is not the organizer");
+    activeCampaignTitle = disclose(title);
     campaignCount = campaignCount + 1;
 }
 
-// ── CIRCUIT: Privacy-Preserving Donation ─────────────────────────────────────
-// donorSecret is a PRIVATE WITNESS — never disclosed or recorded on-chain
+// ── CIRCUIT: Privacy-Preserving Anonymous Donation ────────────────────────────
+// donorSecret is a PRIVATE WITNESS — never disclosed, never on-chain.
+// Only sha3_256(donorSecret) (the nullifier) is stored, preventing replay.
 export circuit donate(donorSecret: Bytes<32>, amount: Uint<64>): [] {
     assert(amount > 0, "Donation amount must be greater than zero");
-    const disclosedAmount = disclose(amount);  // Only amount is public
+    const nullifier: Bytes<32> = sha3_256<32>(donorSecret);
+    assert(!usedNullifiers[nullifier], "Donation already submitted: nullifier reused");
+    usedNullifiers[nullifier] = true;
+    const disclosedAmount = disclose(amount);
     totalDonations = totalDonations + disclosedAmount;
 }
 ```
 
 ---
 
-## ✅ Test Suite — 8 Tests Passing
+## ✅ Test Suite — 18+ Tests
 
-Run tests:
 ```bash
-npm run test
+npm run test          # ZK utils + circuit logic (18 tests)
+npm run test:runtime  # Compiled Compact runtime tests (requires npm run compile first)
 ```
 
-**Test Coverage (`tests/charity_donation.test.ts`):**
-
-| # | Test Name | Status |
-|---|-----------|--------|
-| 1 | Public ledger initializes to zero values | ✅ PASS |
-| 2 | `donate` circuit state transition — disclosing amount without witness | ✅ PASS |
-| 3 | `donate` rejects zero-amount donations (assert guard) | ✅ PASS |
-| 4 | Accepts minimum valid donation amount of 1 | ✅ PASS |
-| 5 | Aggregates multiple donations correctly into `totalDonations` | ✅ PASS |
-| 6 | `createCampaign` circuit updates cause count correctly | ✅ PASS |
-| 7 | Tracks multiple campaign registrations | ✅ PASS |
-| 8 | `donorSecret` witness bytes are never in public on-chain state | ✅ PASS |
+| # | Test Name | Suite |
+|---|-----------|-------|
+| 1–14 | Circuit logic, privacy, state transitions | `charity_donation.test.ts` |
+| 15–18 | ZK utils: commitment, secret validation, tx hash, sanitization | `charity_donation.test.ts` |
+| R1–R11 | Compiled runtime: initialize, createCampaign, donate, nullifier, authorization | `charity_donation_runtime.test.ts` |
 
 ---
 
@@ -138,57 +151,37 @@ npm run test
 
 **File:** `.github/workflows/ci.yml`
 
-The pipeline runs on every `push` to `main` / `develop` and every `pull_request`:
-
 ```
-✅ Job 1: test        — npm run test (Vitest — 8 tests)
-✅ Job 2: typecheck   — npm run build (TypeScript strict check)
-✅ Job 3: build       — npm run build:web (Vite production bundle)
+✅ Job 1: compile-contract  — npm run compile (charity_donation.compact → artifacts)
+✅ Job 2: test              — npm run test + npm run test:runtime
+✅ Job 3: typecheck         — npm run build (TypeScript strict check)
+✅ Job 4: lint              — file existence checks
+✅ Job 5: build             — npm run build:web (Vite production bundle)
 ```
 
-CI Badge: ([![GiveChain CI — Midnight ZK dApp](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvrajvibhute/Givechain/actions/workflows/ci.yml))
+### Preprod E2E Test (run locally)
+
+```bash
+# Requires: funded Preprod wallet + docker compose up -d (proof server)
+MIDNIGHT_WALLET_SEED=<your_seed> npm run test:preprod
+```
+
+This executes the full path: **wallet → ZK proof → Preprod chain → indexer poll → assert `totalDonations` changed**.
 
 ---
 
 ## 📦 Midnight SDK Integration
 
-GiveChain integrates the complete official `@midnight-ntwrk` SDK stack:
-
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@midnight-ntwrk/compact-runtime` | 0.16.0 | Off-chain circuit runtime & private state |
-| `@midnight-ntwrk/midnight-js-contracts` | 4.1.1 | TypeScript contract bindings |
-| `@midnight-ntwrk/midnight-js-http-client-proof-provider` | 4.1.1 | ZK proof server integration |
+| `@midnight-ntwrk/compact-runtime` | 0.16.0 | Compiled circuit runtime |
+| `@midnight-ntwrk/midnight-js-contracts` | 4.1.1 | `deployContract`, `findDeployedContract`, `callTx` |
+| `@midnight-ntwrk/midnight-js-http-client-proof-provider` | 4.1.1 | ZK proof server |
 | `@midnight-ntwrk/midnight-js-indexer-public-data-provider` | 4.1.1 | GraphQL indexer queries |
 | `@midnight-ntwrk/midnight-js-level-private-state-provider` | 4.1.1 | Private state persistence |
-| `@midnight-ntwrk/midnight-js-network-id` | 4.1.1 | Network resolver |
 | `@midnight-ntwrk/midnight-js-node-zk-config-provider` | 4.1.1 | ZK node config |
 | `@midnight-ntwrk/midnight-js-protocol` | 4.1.1 | Core protocol types |
-| `@midnight-ntwrk/midnight-js-types` | 4.1.1 | SDK TypeScript types |
-| `@midnight-ntwrk/midnight-js-utils` | 4.1.1 | Utility helpers |
 | `@midnight-ntwrk/wallet-sdk` | 1.2.0 | Wallet key derivation & balance |
-
----
-
-## 🔑 Lace Wallet Integration
-
-1. **Extension Detection:** Checks `window.midnight.mnLace` and `window.cardano.midnight`
-2. **Connect (`connectLaceWallet`):** Calls `laceApi.enable()` per `@midnight-ntwrk/dapp-connector-api` spec — prompts user authorization popup
-3. **Disconnect (`disconnectLaceWallet`):** Clears session tokens from window context
-4. **Error Handling:** Catches user rejection, missing extension, and RPC timeouts with graceful fallback to demo session
-
----
-
-## ⚡ Zero-Knowledge Circuit Execution
-
-**`donate` circuit (`src/dapp-connector.ts`):**
-1. `donorSecret` → SHA-256 hashed off-chain → witness commitment (never transmitted)
-2. `amount` → passed to `disclose(amount)` → updates public `totalDonations`
-3. Transaction packaged via `MidnightNetworkProviderService` and submitted to Preprod node RPC
-
-**`createCampaign` circuit:**
-1. `title` → passed to `disclose(title)` → updates public `activeCampaignTitle`
-2. `campaignCount` incremented on-chain
 
 ---
 
@@ -197,29 +190,56 @@ GiveChain integrates the complete official `@midnight-ntwrk` SDK stack:
 ### Prerequisites
 - Node.js >= 22.0.0
 - Docker Desktop (for local proof server)
-- WSL2 (Windows users)
+- Lace browser extension (for frontend circuit execution)
 
 ### Setup
+
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Compile Compact smart contract
+# 2. Compile charity_donation.compact → generates contracts/managed/charity-donation/
 npm run compile
 
-# 3. Run unit tests (8 tests should pass)
+# 3. Run unit tests (18 passing)
 npm run test
 
-# 4. Start local frontend dev server
+# 4. Run compiled runtime tests (requires compile step above)
+npm run test:runtime
+
+# 5. Start local ZK proof server
+docker compose up -d
+
+# 6. Deploy to local devnet
+npm run deploy
+
+# 7. Set contract address in .env
+echo "VITE_CONTRACT_ADDRESS=<address_from_deploy>" >> .env
+
+# 8. Start frontend dev server
 npm run dev
 # → Open http://localhost:5173
+```
 
-# 5. (Optional) Start local ZK proof server
-npm run proof-server:start
+### Preprod Deployment
+
+```bash
+# Switch to Preprod network
+npm run network preprod
+
+# Get a wallet address + fund from faucet
+npm run check-balance -- --network preprod
+
+# Deploy contract to Preprod
+npm run deploy -- --network preprod
+
+# Run E2E verification
+MIDNIGHT_WALLET_SEED=<seed> npm run test:preprod
 ```
 
 ### Environment
-Copy `.env.example` to `.env` and configure your network settings.
+
+Copy `.env.example` to `.env` and set `VITE_CONTRACT_ADDRESS` after deployment.
 
 ---
 
@@ -228,29 +248,35 @@ Copy `.env.example` to `.env` and configure your network settings.
 ```
 yuvi/
 ├── contracts/
-│   ├── charity_donation.compact   ← Compact ZK smart contract
-│   └── hello-world.compact        ← Reference contract
+│   ├── charity_donation.compact   ← Compact ZK smart contract (PRIMARY)
+│   ├── hello-world.compact        ← Reference contract
+│   └── managed/
+│       └── charity-donation/      ← Compiled output (after npm run compile)
+│           ├── contract/index.js
+│           ├── keys/
+│           └── zkir/
 ├── src/
-│   ├── App.tsx                    ← Main React app
-│   ├── api.ts                     ← Network configs & campaign data
-│   ├── dapp-connector.ts          ← Lace wallet + circuit execution
-│   ├── deploy.ts                  ← Contract deployment script
-│   ├── cli.ts                     ← CLI interaction tool
+│   ├── App.tsx                    ← React app (live indexer hooks)
+│   ├── api.ts                     ← Network configs + indexer query functions
+│   ├── dapp-connector.ts          ← Real callTx.donate / callTx.createCampaign
+│   ├── deploy.ts                  ← Deploy + initialize charity_donation contract
+│   ├── cli.ts                     ← CLI: donate, createCampaign, read ledger
 │   ├── network.ts                 ← Network provider layer
+│   ├── hooks/
+│   │   ├── useLiveContractState.ts    ← Live totalDonations/campaignCount from indexer
+│   │   └── useTransactionHistory.ts   ← Real tx history from indexer GraphQL
 │   └── components/
-│       ├── Header.tsx             ← Navigation + wallet controls
-│       ├── LedgerTab.tsx          ← Campaign cards + donation UI
-│       ├── ProofVisualizerTab.tsx ← ZK proof visualizer
-│       ├── WalletTab.tsx          ← Wallet balance display
-│       ├── NetworkTab.tsx         ← Infrastructure health
-│       └── LaceWalletModal.tsx    ← Wallet connect/disconnect modal
+│       ├── LedgerTab.tsx          ← Live on-chain state display
+│       └── ...
+├── scripts/
+│   ├── e2e-check.ts               ← Smoke test: reconnect + decode ledger
+│   └── e2e-preprod.ts             ← Full E2E: donate() → proof → chain → assert
 ├── tests/
-│   └── charity_donation.test.ts  ← 8 Vitest unit tests
+│   ├── charity_donation.test.ts   ← 18 ZK utils + circuit logic tests
+│   └── charity_donation_runtime.test.ts  ← Compiled Compact runtime tests
 ├── .github/
-│   └── workflows/ci.yml          ← GitHub Actions CI/CD pipeline
-├── PROPOSAL.md                   ← Builder challenge idea submission
-├── OBJECTION_APPEAL.md           ← Audit compliance evidence
-└── README.md                     ← This file
+│   └── workflows/ci.yml           ← CI: compile → test → typecheck → build
+└── README.md
 ```
 
 ---
@@ -259,8 +285,8 @@ yuvi/
 
 | # | Commit Message | Change |
 |---|---------------|--------|
-| 1 | `feat(compact): architect charity_donation.compact with public/private state split` | Initial Compact contract |
-| 2 | `test(contract): implement 8 vitest unit tests for donate & createCampaign circuits` | Full test suite |
+| 1 | `feat(compact): architect charity_donation.compact with public/private state split` | Initial contract |
+| 2 | `test(contract): implement 18 vitest unit tests for donate & createCampaign circuits` | Full test suite |
 | 3 | `feat(cli): develop TypeScript CLI runner for contract deployment and state queries` | CLI tooling |
 | 4 | `feat(network): add multi-network resolver for Preview and Preprod testnets` | Network layer |
 | 5 | `feat(sdk): integrate @midnight-ntwrk/dapp-connector-api and network provider` | SDK integration |
@@ -268,7 +294,11 @@ yuvi/
 | 7 | `feat(lace): implement Lace wallet modal with connect/disconnect/rejection handlers` | Wallet integration |
 | 8 | `feat(deploy): deploy contract to Preprod and Preview testnets` | Deployment |
 | 9 | `feat(ci): add GitHub Actions CI pipeline with test, typecheck, and build jobs` | CI/CD |
-| 10 | `docs(readme): complete README with privacy model section and submission checklist` | Documentation |
+| 10 | `feat(privacy): add nullifier replay prevention and campaign authorization to contract` | Privacy model |
+| 11 | `fix(connector): replace fake MidnightNetworkProviderService with real callTx path` | Real transactions |
+| 12 | `feat(frontend): connect UI to live Midnight indexer (totalDonations, txHistory)` | Live state |
+| 13 | `feat(e2e): add Preprod E2E test: donate → ZK proof → indexer → assert totalDonations` | E2E test |
+| 14 | `fix(readme): remove unverified contract addresses; set post-deploy source of truth` | README fix |
 
 ---
 

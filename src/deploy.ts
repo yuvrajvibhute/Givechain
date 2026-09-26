@@ -1,8 +1,10 @@
 /**
- * Deploy yuvi contract to a Midnight network (undeployed by default; use --network preview|preprod for public networks).
+ * Deploy GiveChain charity_donation contract to a Midnight network.
  *
- * Non-interactive: scaffold → npm run setup runs straight through.
- * No readline prompts, no .midnight-seed file.
+ * Usage:
+ *   npm run deploy                        # local devnet (undeployed)
+ *   npm run deploy -- --network preprod   # Preprod testnet
+ *   npm run deploy -- --network preview   # Preview testnet
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -23,23 +25,15 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 // @ts-expect-error Required for wallet sync
 globalThis.WebSocket = WebSocket;
 
-// Identifier under which this contract's private state is stored. The
-// hello-world contract has no witnesses, so its private state is empty ({}).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
+// Private state identifier — must match across deploy, cli, and e2e-check.
+const PRIVATE_STATE_ID = 'charityDonationPrivateState';
 
-// ─── Network configuration ─────────────────────────────────────────────────────
-//
-// Resolved from --network flag, .midnight-state.json, or defaulting to
-// 'undeployed' (local devnet). Switch networks with: npm run network <name>
+// ─── Network configuration ────────────────────────────────────────────────────
 
 const { network, config: networkConfig } = resolveNetwork();
 const SEED = getOrCreateSeed(network);
 
-// ─── Proof server readiness ────────────────────────────────────────────────────
-//
-// The proof-server image is distroless and has no shell, so it can't run a
-// container-side healthcheck. Poll it from the host before we submit anything
-// that needs proofs.
+// ─── Proof server readiness ───────────────────────────────────────────────────
 
 async function waitForProofServer(maxAttempts = 60, delayMs = 2000): Promise<boolean> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -63,40 +57,36 @@ async function waitForProofServer(maxAttempts = 60, delayMs = 2000): Promise<boo
   return false;
 }
 
-// ─── Compiled contract loading ─────────────────────────────────────────────────
+// ─── Compiled contract loading ────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
+// Target: contracts/managed/charity-donation (compiled from charity_donation.compact)
+const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'charity-donation');
 const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
 
 if (!fs.existsSync(contractPath)) {
-  console.error('\n❌ Contract not compiled! Run: npm run compile\n');
+  console.error('\n❌ Charity donation contract not compiled!');
+  console.error('   Run: npm run compile\n');
   process.exit(1);
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
+const CharityDonation = await import(pathToFileURL(contractPath).href);
 
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
+const compiledContract = CompiledContract.make('charity-donation', CharityDonation.Contract).pipe(
   CompiledContract.withVacantWitnesses,
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
 
-// ─── Providers ─────────────────────────────────────────────────────────────────
+// ─── Providers ────────────────────────────────────────────────────────────────
 
 async function createProviders(walletCtx: WalletContext) {
-  // The SDK requires the private-state password to be at least 16 characters.
-  // The default below is a placeholder for local devnet only — set a strong
-  // password via PRIVATE_STATE_PASSWORD when you move to a non-local target.
-  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Local-Devnet-Development-Placeholder-1';
+  const privateStatePassword =
+    process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Local-Devnet-Development-Placeholder-1';
 
   const walletProvider = {
-    // In Midnight.js 4.1.x the WalletProvider interface returns the key objects
-    // (CoinPublicKey / EncPublicKey) directly — no longer hex strings.
     getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
     getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
     async balanceTx(tx: any, ttl?: Date) {
-      // balanceUnboundTransaction -> finalizeRecipe is the complete balancing
-      // path in wallet-sdk 1.x; the earlier explicit signRecipe step is gone.
       const recipe = await walletCtx.wallet.balanceUnboundTransaction(
         tx,
         { shieldedSecretKeys: walletCtx.shieldedSecretKeys, dustSecretKey: walletCtx.dustSecretKey },
@@ -112,7 +102,7 @@ async function createProviders(walletCtx: WalletContext) {
 
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'charity-donation-state',
       accountId,
       privateStoragePasswordProvider: () => privateStatePassword,
     }),
@@ -124,26 +114,23 @@ async function createProviders(walletCtx: WalletContext) {
   };
 }
 
-// ─── Main ──────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log(`║  Deploy yuvi to ${network}`);
+  console.log(`║  Deploy GiveChain Charity Contract → ${network}`);
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
-
-  const seed = SEED;
 
   console.log('─── Wallet setup ───────────────────────────────────────────────\n');
   console.log('  Creating wallet...');
-  const walletCtx = await createWallet({ network, networkConfig, seed });
+  const walletCtx = await createWallet({ network, networkConfig, seed: SEED });
   const restoredCount = Object.values(walletCtx.restored).filter(Boolean).length;
   if (restoredCount > 0) {
     console.log(`  Restored ${restoredCount}/3 child wallets from .midnight-wallet-state — sync will resume from saved point.`);
   }
 
   console.log('  Syncing with network...');
-  console.log('  ℹ  This may take several minutes depending on network size.');
-  console.log('     RPC disconnection messages during sync are normal and can be safely ignored.\n');
+  console.log('  ℹ  This may take several minutes depending on network size.\n');
   const syncStart = Date.now();
   const syncInterval = setInterval(() => {
     const elapsed = Math.round((Date.now() - syncStart) / 1000);
@@ -153,7 +140,6 @@ async function main() {
   clearInterval(syncInterval);
   process.stdout.write('\r  ✓ Synced with network.                                      \n');
 
-  // Persist sync state now so a later deploy failure doesn't waste the sync work.
   await persistWalletState(network, walletCtx);
 
   const address = walletCtx.unshieldedKeystore.getBech32Address();
@@ -163,30 +149,23 @@ async function main() {
 
   if (network === 'undeployed' && balance === 0n) {
     console.error(
-      '\n❌ Genesis-seed wallet has zero NIGHT. The devnet preset may not have minted to it.\n' +
-        '   Check `docker compose ps` and `docker compose logs node`. Then `docker compose down -v` and retry.\n',
+      '\n❌ Genesis-seed wallet has zero NIGHT. Check docker compose logs node.\n',
     );
     await walletCtx.wallet.stop();
     process.exit(1);
   }
 
-  // Faucet poll for public networks. The wallet has 0 tNIGHT until the user
-  // funds the address from the network's faucet. The display balance is
-  // authoritative here (unlike DUST, tNIGHT shows up immediately once the
-  // faucet tx lands).
+  // Faucet poll for public networks.
   if (network !== 'undeployed' && networkConfig.faucet) {
-    // Same balance idiom used by check-balance.ts:
-    //   state.unshielded.balances[unshieldedToken().raw] ?? 0n
-    const initialBalance = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(
-      Rx.filter((s) => s.isSynced),
-    ));
+    const initialBalance = await Rx.firstValueFrom(
+      walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)),
+    );
     const initialTNight = initialBalance.unshielded.balances[unshieldedToken().raw] ?? 0n;
     if (initialTNight === 0n) {
       console.log('─── Fund Wallet ────────────────────────────────────────────────\n');
       console.log(`  Wallet address: ${address}`);
       console.log(`  Faucet:         ${networkConfig.faucet}`);
-      console.log('');
-      console.log('  Waiting for tNIGHT to arrive (poll every 10s)...');
+      console.log('\n  Waiting for tNIGHT to arrive (poll every 10s)...');
       const rawTimeout = Number(process.env.MIDNIGHT_FAUCET_TIMEOUT_MS);
       const timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? rawTimeout : 600_000;
       const start = Date.now();
@@ -202,7 +181,6 @@ async function main() {
           console.log(`\n  ❌ Funding not received within ${Math.round(timeoutMs / 60_000)} min.`);
           console.log(`  Address: ${address}`);
           console.log(`  Faucet:  ${networkConfig.faucet}`);
-          console.log('  Re-run setup after funding — your seed is preserved.\n');
           await walletCtx.wallet.stop();
           process.exit(1);
         }
@@ -221,10 +199,6 @@ async function main() {
   );
   if (unregisteredUtxos.length > 0) {
     console.log(`  Registering ${unregisteredUtxos.length} NIGHT UTXOs for DUST generation...`);
-    // The signDustRegistration callback (3rd arg) already produces a recipe
-    // with N signatures matching N inputs. Do NOT call signRecipe again — that
-    // would double-sign and the chain rejects with InputsSignaturesLengthMismatch
-    // (Custom error 192). Matches upstream example-counter and example-bboard.
     const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
       unregisteredUtxos,
       walletCtx.unshieldedKeystore.getPublicKey(),
@@ -261,36 +235,21 @@ async function main() {
   console.log('  Setting up providers...');
   const providers = await createProviders(walletCtx);
 
-  // The wallet's reported DUST balance is a *time-projection* of what its
-  // registered NIGHT will eventually generate; the tx-builder spends only
-  // what the next block's timestamp accounts for, which lags wall-clock by
-  // ~1 block on a fresh devnet. Sleeping ~1 block-time before attempt 1
-  // closes that gap in the common case; the retry loop covers outliers.
   process.stdout.write('  Generating DUST...');
   await new Promise((r) => setTimeout(r, 6000));
   process.stdout.write(' done.\n');
 
-  console.log('  Deploying contract...\n');
+  console.log('  Deploying charity_donation contract...\n');
 
-  // Fallback timing. The 6s pre-pause above handles the common case; this
-  // loop covers genuine outliers (slow blocks, proof-server worker-pool
-  // settling). Earlier 2s retries caused CI flakes where attempt 2's /prove
-  // hit the proof-server before it had drained attempt 1's state — 5s gives
-  // it room to settle between attempts. 20 × 5 = 100s total budget.
   const MAX_RETRIES = 20;
   const RETRY_DELAY_MS = 5000;
   let deployed: Awaited<ReturnType<typeof deployContract>> | undefined;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      // Midnight.js 4.1.x supplies private state via privateStateId +
-      // initialPrivateState (empty here — the hello-world contract has no
-      // witnesses). args is the contract constructor's arguments: empty for
-      // hello-world's no-arg constructor. (Statically-typed contracts can omit
-      // args entirely; this script loads the contract dynamically, so the
-      // conditional args type widens to any[] and an explicit [] is required.)
       deployed = await deployContract(providers, {
         compiledContract: compiledContract as any,
+        // No constructor args — initialPrivateState is empty (witnesses are per-call, not persisted)
         args: [],
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
@@ -301,19 +260,11 @@ async function main() {
       const errCause = err?.cause?.message || err?.cause?.toString() || '';
       const fullError = `${errMsg} ${errCause}`;
 
-      // DUST shortage is the most common transient failure on a fresh devnet —
-      // check it BEFORE proof-server connectivity, because dust-balancing errors
-      // can surface through proof-server-shaped messages (the wallet talks to
-      // the proof-server while building the dust portion of the tx).
       const isDustShortage =
         fullError.includes('Not enough Dust') ||
         fullError.includes('Insufficient Funds') ||
         fullError.includes('could not balance dust');
 
-      // Transient indexer/network errors on public testnets (Preview, Preprod).
-      // The Preview indexer occasionally returns "An unknown error occurred"
-      // or ServerError during tx submission — these are transient and retrying
-      // after a short back-off resolves them in practice.
       const isTransientNetworkError =
         fullError.includes('An unknown error occurred') ||
         fullError.includes('ServerError') ||
@@ -323,10 +274,6 @@ async function main() {
         fullError.includes('network error') ||
         fullError.includes('fetch failed');
 
-      // Quiet the first DUST-shortage retry: it's the expected race between
-      // wall-clock projection and block-timestamp accounting and the loud
-      // `Insufficient Funds: <huge number>` message scares first-time users.
-      // Real failures still get the full diagnostic from attempt 2 onward.
       if (!(isDustShortage && attempt === 1)) {
         console.error(`\n  Attempt ${attempt} error: ${errMsg}`);
         if (errCause && errCause !== errMsg) console.error(`  Cause: ${errCause}`);
@@ -342,10 +289,6 @@ async function main() {
         process.exit(1);
       }
 
-      // Stale UTXO / invalid transaction — the wallet's local state is out of
-      // sync with the chain (a previous tx may have spent a UTXO that the cache
-      // still shows as available). Retrying without a resync will always fail.
-      // Guide the user to clear .midnight-wallet-state and re-run.
       const isStaleUtxo =
         fullError.includes('Invalid Transaction') ||
         fullError.includes('Custom error: 170') ||
@@ -371,12 +314,11 @@ async function main() {
           }
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
         } else {
-          console.log(`  ❌ Not enough DUST after ${MAX_RETRIES} retries (current: ${dustBalance.toLocaleString()})`);
+          console.log(`  ❌ Not enough DUST after ${MAX_RETRIES} retries`);
           await walletCtx.wallet.stop();
           process.exit(1);
         }
       } else if (isTransientNetworkError && attempt < MAX_RETRIES) {
-        // Transient indexer/RPC error — back off and retry.
         const backoff = Math.min(RETRY_DELAY_MS * attempt, 30_000);
         console.log(`  ⏳ Transient network error (attempt ${attempt}/${MAX_RETRIES}); retrying in ${backoff / 1000}s...`);
         await new Promise((r) => setTimeout(r, backoff));
@@ -389,16 +331,39 @@ async function main() {
   if (!deployed) throw new Error('Deployment failed after all retries');
 
   const contractAddress = deployed.deployTxData.public.contractAddress;
-  console.log('  ✅ Contract deployed successfully!\n');
+  console.log('  ✅ charity_donation contract deployed!\n');
   console.log(`  Contract Address: ${contractAddress}\n`);
 
   recordDeployment(network, contractAddress, address.toString());
   console.log('  Saved to .midnight-state.json\n');
 
+  // Initialize: set the authorized organizer to the deploying wallet's address.
+  console.log('─── Initialize Contract ────────────────────────────────────────\n');
+  console.log('  Calling initialize() to set authorized organizer...');
+  try {
+    const initTx = await (deployed as any).callTx.initialize(address.toString());
+    console.log(`  ✅ Organizer set to: ${address}`);
+    console.log(`  Init tx: ${initTx.public.txId}`);
+  } catch (err: any) {
+    // If the contract was already initialized (e.g. re-deployed address), skip gracefully.
+    const msg = err?.message || String(err);
+    if (msg.includes('already initialized')) {
+      console.log('  ℹ  Contract was already initialized — skipping.');
+    } else {
+      console.error(`  ⚠ initialize() failed: ${msg}`);
+      console.error('  The contract is deployed but the organizer was not set.');
+      console.error('  Re-run deploy or call initialize() manually via the CLI.');
+    }
+  }
+
   await persistWalletState(network, walletCtx);
   await walletCtx.wallet.stop();
+
   console.log('─── Deployment complete ────────────────────────────────────────\n');
-  console.log('  Next: npm run cli\n');
+  console.log('  Next steps:');
+  console.log('    npm run cli          → interact with the contract');
+  console.log('    npm run test:e2e     → verify deployment');
+  console.log(`    Set VITE_CONTRACT_ADDRESS=${contractAddress} in .env\n`);
 }
 
 main().catch((err) => {

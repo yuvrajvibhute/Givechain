@@ -1,24 +1,43 @@
 import React, { useState } from 'react';
-import { Heart, Plus, ShieldCheck, Lock, ArrowUpRight, Check, FileText, AlertCircle } from 'lucide-react';
-import { TransactionRecord, INITIAL_CAMPAIGNS, CharityCampaign } from '../api';
+import { Heart, Plus, ShieldCheck, Lock, ArrowUpRight, Check, FileText, AlertCircle, RefreshCw, Activity } from 'lucide-react';
+import { TransactionRecord, CharityCampaign } from '../api';
 import { DonationHistoryExport } from './DonationHistoryExport';
 
 interface LedgerTabProps {
   contractAddress: string;
   transactions: TransactionRecord[];
+  campaigns?: CharityCampaign[];
   onDonate: (campaignTitle: string, amount: number, donorSecret: string) => Promise<void>;
   onCreateCampaign: (title: string, category: string, targetAmount: number) => Promise<void>;
   isSubmitting: boolean;
+  // Live on-chain state from Midnight indexer
+  totalDonations?: bigint;
+  campaignCount?: bigint;
+  activeCampaignTitle?: string;
+  stateLoading?: boolean;
+  stateError?: string | null;
+  lastUpdated?: string | null;
+  onRefresh?: () => void;
+  isLaceConnected?: boolean;
 }
 
 export const LedgerTab: React.FC<LedgerTabProps> = ({
   contractAddress,
   transactions,
+  campaigns: campaignsProp,
   onDonate,
   onCreateCampaign,
   isSubmitting,
+  totalDonations = 0n,
+  campaignCount = 0n,
+  activeCampaignTitle = '',
+  stateLoading = false,
+  stateError = null,
+  lastUpdated = null,
+  onRefresh,
+  isLaceConnected = false,
 }) => {
-  const [campaigns, setCampaigns] = useState<CharityCampaign[]>(INITIAL_CAMPAIGNS);
+  const [campaigns, setCampaigns] = useState<CharityCampaign[]>(campaignsProp ?? []);
   const [selectedCampaign, setSelectedCampaign] = useState<CharityCampaign | null>(null);
   const [donationAmount, setDonationAmount] = useState<number>(50);
   const [customAmountInput, setCustomAmountInput] = useState<string>('');
@@ -31,9 +50,11 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const [newCategory, setNewCategory] = useState('Humanitarian');
   const [newTarget, setNewTarget] = useState(10000);
 
-  const totalRaised = campaigns.reduce((sum, c) => sum + (c.raisedAmount ?? 0), 0);
+  // Use on-chain totalDonations as the real raised amount if available
+  const totalRaised = totalDonations > 0n ? Number(totalDonations) : campaigns.reduce((sum, c) => sum + (c.raisedAmount ?? 0), 0);
   const totalGoal = campaigns.reduce((sum, c) => sum + (c.targetGoal ?? c.targetAmount ?? 10000), 0);
   const overallPercentage = totalGoal > 0 ? Math.min(Math.round((totalRaised / totalGoal) * 100), 100) : 0;
+
 
   const handleOpenDonateModal = (campaign: CharityCampaign) => {
     setSelectedCampaign(campaign);
@@ -46,7 +67,10 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const handleCustomAmountChange = (raw: string) => {
     setCustomAmountInput(raw);
     const parsed = parseFloat(raw);
-    if (raw === '') { setCustomAmountError(''); return; }
+    if (raw === '') {
+      setCustomAmountError('');
+      return;
+    }
     if (isNaN(parsed) || parsed <= 0) {
       setCustomAmountError('Amount must be greater than $0');
     } else if (parsed > 1_000_000) {
@@ -60,20 +84,11 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   const handleConfirmDonation = async () => {
     if (!selectedCampaign) return;
 
-    // Secret runtime witness generated on-client
+    // Use a random hex secret as the donor witness (the real secret is generated client-side).
     const runtimeSecret = '0x' + Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
     await onDonate(selectedCampaign.title, donationAmount, runtimeSecret);
-
-    // Update local campaign tally
-    setCampaigns((prev) =>
-      prev.map((c) =>
-        c.id === selectedCampaign.id
-          ? { ...c, raisedAmount: (c.raisedAmount ?? 0) + donationAmount, donorCount: (c.donorCount ?? 0) + 1 }
-          : c
-      )
-    );
-
+    // On-chain totalDonations updates via the useLiveContractState polling hook.
     setIsModalOpen(false);
   };
 
@@ -129,29 +144,62 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
           </button>
         </div>
 
-        {/* Live Metrics Highlights */}
+        {/* Live Metrics Highlights — sourced from Midnight indexer */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[#FFFFFF]/15">
           <div>
-            <span className="text-xs text-[#A8C8D4] font-medium block">Total Public Funds Raised</span>
-            <div className="text-2xl font-bold font-mono-num text-[#FFFFFF] mt-0.5">
-              ${(totalRaised ?? 0).toLocaleString()} <span className="text-xs font-normal text-[#A8C8D4]">USD</span>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-xs text-[#A8C8D4] font-medium">Total Public Funds Raised</span>
+              {stateLoading && <Activity className="w-3 h-3 text-[#A8C8D4] animate-pulse" />}
             </div>
+            <div className="text-2xl font-bold font-mono-num text-[#FFFFFF] mt-0.5">
+              {stateLoading
+                ? <span className="text-lg text-[#A8C8D4]">Loading…</span>
+                : <>{totalDonations.toLocaleString()} <span className="text-xs font-normal text-[#A8C8D4]">tNIGHT on-chain</span></>}
+            </div>
+            {stateError && (
+              <div className="text-[10px] text-amber-300 mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                <span>Indexer: {stateError.slice(0, 60)}</span>
+              </div>
+            )}
           </div>
 
           <div>
-            <span className="text-xs text-[#A8C8D4] font-medium block">Verified Cause Milestone</span>
-            <div className="text-2xl font-bold font-mono-num text-[#FFFFFF] mt-0.5">
-              {overallPercentage}% <span className="text-xs font-normal text-[#A8C8D4]">of ${(totalGoal ?? 0).toLocaleString()}</span>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-xs text-[#A8C8D4] font-medium">On-Chain Campaign Count</span>
             </div>
+            <div className="text-2xl font-bold font-mono-num text-[#FFFFFF] mt-0.5">
+              {stateLoading
+                ? <span className="text-lg text-[#A8C8D4]">—</span>
+                : <>{campaignCount.toLocaleString()} <span className="text-xs font-normal text-[#A8C8D4]">campaigns</span></>}
+            </div>
+            {activeCampaignTitle && (
+              <div className="text-[10px] text-[#D3E1E8] mt-1 truncate">
+                Latest: "{activeCampaignTitle}"
+              </div>
+            )}
           </div>
 
           <div>
-            <span className="text-xs text-[#A8C8D4] font-medium block">Contract ID (Preview Testnet)</span>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-xs text-[#A8C8D4] font-medium">Contract Address</span>
+              {onRefresh && (
+                <button onClick={onRefresh} className="text-[#A8C8D4] hover:text-white transition" title="Refresh from indexer">
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <div className="text-xs font-mono-num text-[#D3E1E8] mt-1 truncate">
               {contractAddress}
             </div>
+            {lastUpdated && (
+              <div className="text-[10px] text-[#A8C8D4] mt-1">
+                Updated {new Date(lastUpdated).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
+
 
         {/* Signature Element: Staked Contribution Progress Bar */}
         <div className="mt-6 space-y-1.5">
@@ -334,7 +382,11 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => { setDonationAmount(amt); setCustomAmountInput(''); setCustomAmountError(''); }}
+                      onClick={() => {
+                        setDonationAmount(amt);
+                        setCustomAmountInput('');
+                        setCustomAmountError('');
+                      }}
                       className={`flex-1 py-2 text-xs font-bold rounded-lg border transition ${
                         donationAmount === amt && customAmountInput === ''
                           ? 'bg-[#0D3B4C] text-[#FFFFFF] border-[#0D3B4C]'
@@ -345,6 +397,7 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
                     </button>
                   ))}
                 </div>
+                {/* Custom amount input */}
                 <div className="mt-1">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#57656E]">$</span>
@@ -388,7 +441,7 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
               </button>
               <button
                 onClick={handleConfirmDonation}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!customAmountError}
                 className="cta-button flex-1 justify-center"
               >
                 {isSubmitting ? 'Generating ZK Proof...' : `Confirm $${donationAmount} Donation`}

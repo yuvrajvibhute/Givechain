@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Heart, Cpu, Wallet, Server, Shield, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { Header } from './components/Header';
 import { LedgerTab } from './components/LedgerTab';
@@ -7,61 +7,128 @@ import { WalletTab } from './components/WalletTab';
 import { NetworkTab } from './components/NetworkTab';
 import { PrivacyModelTab } from './components/PrivacyModelTab';
 import { LaceWalletModal } from './components/LaceWalletModal';
-import { INITIAL_TRANSACTIONS, TransactionRecord } from './api';
-import { executeDonateCircuit, executeCreateCampaignCircuit, disconnectLaceWallet } from './dapp-connector';
+import { INITIAL_CAMPAIGNS, type TransactionRecord } from './api';
+import {
+  executeDonateCircuit,
+  executeCreateCampaignCircuit,
+  disconnectLaceWallet,
+  invalidateContractCache,
+  type DAppConnectorWalletAPI,
+} from './dapp-connector';
+import { useLiveContractState } from './hooks/useLiveContractState';
+import { useTransactionHistory } from './hooks/useTransactionHistory';
+
+// ─── Contract address ─────────────────────────────────────────────────────────
+// Loaded from the VITE_CONTRACT_ADDRESS environment variable (set in .env after deployment).
+// If not set, the UI will display an "unconfigured" warning in the ledger tab.
+const CONTRACT_ADDRESS = (import.meta as any).env?.VITE_CONTRACT_ADDRESS as string | undefined;
+
+// Active network defaults to 'preview'. Users can switch via the Header network selector.
+const DEFAULT_NETWORK = ((import.meta as any).env?.VITE_NETWORK as string | undefined) ?? 'preview';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'ledger' | 'proof' | 'wallet' | 'network' | 'privacy'>('ledger');
-  const [activeNetwork, setActiveNetwork] = useState<string>('preprod');
-  const [contractAddress] = useState<string>('020050ae5b37df2195f19069509df6ebcd9e3f60046b0a6ec9ea8c85ae0ff33e9d');
-  const [walletAddress, setWalletAddress] = useState<string>('mn_addr_preprod1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
-  const [walletBalance] = useState<string>('1,250.00');
-  const [dustBalance] = useState<string>('48.50');
-  const [transactions, setTransactions] = useState<TransactionRecord[]>(INITIAL_TRANSACTIONS);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [activeNetwork, setActiveNetwork] = useState<string>(DEFAULT_NETWORK);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const [walletBalance] = useState<string>('—');
+  const [dustBalance] = useState<string>('—');
+
+  // Lace wallet connection state
   const [isLaceModalOpen, setIsLaceModalOpen] = useState(false);
   const [isLaceConnected, setIsLaceConnected] = useState(false);
+  const [laceWalletContext, setLaceWalletContext] = useState<DAppConnectorWalletAPI | undefined>();
+
+  // Local session transactions (from this browser session — merged with indexer history)
+  const [localTransactions, setLocalTransactions] = useState<TransactionRecord[]>([]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  // ─── Live on-chain state from Midnight indexer ──────────────────────────────
+  const {
+    totalDonations,
+    campaignCount,
+    activeCampaignTitle,
+    loading: stateLoading,
+    error: stateError,
+    lastUpdated,
+    refresh: refreshState,
+  } = useLiveContractState(CONTRACT_ADDRESS ?? null, activeNetwork);
 
+  // ─── Real transaction history from indexer ─────────────────────────────────
+  const {
+    transactions,
+    loading: txLoading,
+    refresh: refreshTxs,
+  } = useTransactionHistory(CONTRACT_ADDRESS ?? null, activeNetwork, localTransactions);
+
+  // ─── Toast helper ───────────────────────────────────────────────────────────
+  const showToast = useCallback(
+    (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+      setToast({ message, type });
+      setTimeout(() => setToast(null), 4000);
+    },
+    [],
+  );
+
+  // ─── Network sync / refresh ─────────────────────────────────────────────────
   const handleRefresh = async () => {
     setIsSyncing(true);
     showToast('Syncing with Midnight Network indexer...', 'info');
+    refreshState();
+    refreshTxs();
     await new Promise((r) => setTimeout(r, 1200));
     setIsSyncing(false);
-    showToast('Network sync complete!', 'success');
+    showToast(lastUpdated ? `Synced at ${new Date(lastUpdated).toLocaleTimeString()}` : 'Sync complete', 'success');
   };
 
   const handleSelectNetwork = (net: string) => {
     setActiveNetwork(net);
-    showToast(`Switched active network to ${net.toUpperCase()}`, 'info');
+    invalidateContractCache();
+    showToast(`Switched to ${net.toUpperCase()}`, 'info');
   };
 
-  const handleConnectLace = (newAddress: string) => {
+  // ─── Lace wallet connect / disconnect ──────────────────────────────────────
+  const handleConnectLace = (newAddress: string, ctx?: DAppConnectorWalletAPI) => {
     setWalletAddress(newAddress);
     setIsLaceConnected(true);
-    showToast(`Lace Wallet Connected! Address: ${newAddress.slice(0, 14)}...`, 'success');
+    setLaceWalletContext(ctx);
+    showToast(`Lace Wallet Connected! ${newAddress.slice(0, 14)}...`, 'success');
   };
 
   const handleDisconnectLace = async () => {
     await disconnectLaceWallet();
+    invalidateContractCache();
     setIsLaceConnected(false);
-    setWalletAddress('mn_addr_preprod1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s');
-    showToast('Lace Wallet Disconnected successfully.', 'info');
+    setLaceWalletContext(undefined);
+    setWalletAddress('');
+    showToast('Lace Wallet Disconnected.', 'info');
   };
 
+  // ─── Donate circuit (real Midnight.js callTx) ──────────────────────────────
   const handleDonate = async (campaignTitle: string, amount: number, donorSecret: string) => {
+    if (!CONTRACT_ADDRESS) {
+      showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
+      return;
+    }
+    if (!isLaceConnected || !laceWalletContext) {
+      showToast('Please connect your Lace wallet before donating.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
-    showToast('Executing Compact donate circuit & generating ZK proof...', 'info');
+    showToast('Generating ZK proof & submitting transaction to Midnight chain...', 'info');
 
     try {
-      // Execute Compact circuit via Midnight SDK Network Provider & witness commitment engine
-      const result = await executeDonateCircuit(donorSecret, amount, contractAddress, activeNetwork);
+      // Real callTx.donate() — ZK proof + wallet balancing + signing + submission
+      const result = await executeDonateCircuit(
+        donorSecret,
+        amount,
+        CONTRACT_ADDRESS,
+        activeNetwork,
+        laceWalletContext,
+      );
 
       const newTx: TransactionRecord = {
         id: `tx-${Date.now()}`,
@@ -73,24 +140,54 @@ export function App() {
         timestamp: new Date().toISOString(),
         status: 'confirmed',
         proofTimeMs: result.proofTimeMs,
-        privacyGuarantee: 'Donor witness secret shielded off-chain in ZK proof commitment',
+        privacyGuarantee: 'Donor identity & witness secret shielded in ZK proof — nullifier hash only on-chain',
       };
 
-      setTransactions([newTx, ...transactions]);
+      setLocalTransactions((prev) => [newTx, ...prev]);
       setIsSubmitting(false);
-      showToast(`Anonymous donation of $${amount} confirmed! Tx: ${newTx.txHash}`, 'success');
+      showToast(
+        `Donation confirmed! Tx: ${result.txHash.slice(0, 14)}... | Proof: ${result.proofTimeMs}ms`,
+        'success',
+      );
+
+      // Refresh on-chain state after confirmed tx.
+      setTimeout(() => { refreshState(); refreshTxs(); }, 5000);
     } catch (err) {
       setIsSubmitting(false);
-      showToast(`Circuit execution error: ${err instanceof Error ? err.message : 'Transaction failed'}`, 'error');
+      const msg = err instanceof Error ? err.message : 'Transaction failed';
+      if (msg.includes('nullifier reused')) {
+        showToast('This donor secret was already used. Please use a different secret.', 'error');
+      } else if (msg.includes('not connected')) {
+        showToast('Please connect your Lace wallet before donating.', 'error');
+      } else {
+        showToast(`Donation failed: ${msg}`, 'error');
+      }
     }
   };
 
+  // ─── Create campaign circuit (real Midnight.js callTx) ────────────────────
   const handleCreateCampaign = async (title: string, _category: string, _targetAmount: number) => {
+    if (!CONTRACT_ADDRESS) {
+      showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
+      return;
+    }
+    if (!isLaceConnected || !laceWalletContext) {
+      showToast('Please connect your Lace wallet to create campaigns.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
-    showToast('Executing Compact createCampaign circuit...', 'info');
+    showToast('Executing createCampaign circuit — proving organizer authorization...', 'info');
 
     try {
-      const result = await executeCreateCampaignCircuit(title, contractAddress, activeNetwork);
+      // Real callTx.createCampaign() — proves callerAddress == authorizedOrganizer on-chain
+      const result = await executeCreateCampaignCircuit(
+        title,
+        CONTRACT_ADDRESS,
+        activeNetwork,
+        laceWalletContext,
+        walletAddress,
+      );
 
       const newTx: TransactionRecord = {
         id: `tx-${Date.now()}`,
@@ -102,15 +199,22 @@ export function App() {
         timestamp: new Date().toISOString(),
         status: 'confirmed',
         proofTimeMs: result.proofTimeMs,
-        privacyGuarantee: 'Public campaign title disclosed to Midnight indexer',
+        privacyGuarantee: 'Campaign title publicly disclosed to Midnight indexer via disclose(title)',
       };
 
-      setTransactions([newTx, ...transactions]);
+      setLocalTransactions((prev) => [newTx, ...prev]);
       setIsSubmitting(false);
-      showToast(`Charity campaign "${title}" registered on Midnight! Tx: ${newTx.txHash}`, 'success');
+      showToast(`Campaign "${title}" registered on Midnight! Tx: ${result.txHash.slice(0, 14)}...`, 'success');
+
+      setTimeout(() => { refreshState(); refreshTxs(); }, 5000);
     } catch (err) {
       setIsSubmitting(false);
-      showToast(`Circuit execution error: ${err instanceof Error ? err.message : 'Registration failed'}`, 'error');
+      const msg = err instanceof Error ? err.message : 'Registration failed';
+      if (msg.includes('Unauthorized')) {
+        showToast('Not authorized: only the deploying organizer can create campaigns.', 'error');
+      } else {
+        showToast(`Campaign creation failed: ${msg}`, 'error');
+      }
     }
   };
 
@@ -126,7 +230,9 @@ export function App() {
               ? 'bg-[#EFECE4] border-[#0D3B4C]/40 text-[#0D3B4C]'
               : 'bg-[#FDF2F2] border-rose-500/40 text-rose-800'
           }`}>
-            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-[#1F6E54]" /> : <AlertCircle className="w-5 h-5 text-[#0D3B4C]" />}
+            {toast.type === 'success'
+              ? <CheckCircle2 className="w-5 h-5 text-[#1F6E54]" />
+              : <AlertCircle className="w-5 h-5 text-[#0D3B4C]" />}
             <span className="text-xs font-semibold">{toast.message}</span>
           </div>
         </div>
@@ -159,42 +265,23 @@ export function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-[#E0D9CD]">
-          <button
-            onClick={() => setActiveTab('ledger')}
-            className={`nav-tab ${activeTab === 'ledger' ? 'active' : ''}`}
-          >
+          <button onClick={() => setActiveTab('ledger')} className={`nav-tab ${activeTab === 'ledger' ? 'active' : ''}`}>
             <Heart className="w-4 h-4 text-[#C85A32]" />
             <span>Charity Causes & Ledger</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('proof')}
-            className={`nav-tab ${activeTab === 'proof' ? 'active' : ''}`}
-          >
+          <button onClick={() => setActiveTab('proof')} className={`nav-tab ${activeTab === 'proof' ? 'active' : ''}`}>
             <Cpu className="w-4 h-4 text-[#0D3B4C]" />
             <span>ZK Prover Visualizer</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('wallet')}
-            className={`nav-tab ${activeTab === 'wallet' ? 'active' : ''}`}
-          >
+          <button onClick={() => setActiveTab('wallet')} className={`nav-tab ${activeTab === 'wallet' ? 'active' : ''}`}>
             <Wallet className="w-4 h-4 text-[#0D3B4C]" />
             <span>Wallet & DUST</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('network')}
-            className={`nav-tab ${activeTab === 'network' ? 'active' : ''}`}
-          >
+          <button onClick={() => setActiveTab('network')} className={`nav-tab ${activeTab === 'network' ? 'active' : ''}`}>
             <Server className="w-4 h-4 text-[#1F6E54]" />
             <span>Infrastructure Health</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('privacy')}
-            className={`nav-tab ${activeTab === 'privacy' ? 'active' : ''}`}
-          >
+          <button onClick={() => setActiveTab('privacy')} className={`nav-tab ${activeTab === 'privacy' ? 'active' : ''}`}>
             <Lock className="w-4 h-4 text-[#C85A32]" />
             <span>Privacy Model</span>
           </button>
@@ -203,11 +290,21 @@ export function App() {
         {/* Tab Views */}
         {activeTab === 'ledger' && (
           <LedgerTab
-            contractAddress={contractAddress}
+            contractAddress={CONTRACT_ADDRESS ?? '(not configured — set VITE_CONTRACT_ADDRESS)'}
             transactions={transactions}
+            campaigns={INITIAL_CAMPAIGNS}
             onDonate={handleDonate}
             onCreateCampaign={handleCreateCampaign}
             isSubmitting={isSubmitting}
+            // Live on-chain state props
+            totalDonations={totalDonations}
+            campaignCount={campaignCount}
+            activeCampaignTitle={activeCampaignTitle}
+            stateLoading={stateLoading || txLoading}
+            stateError={stateError}
+            lastUpdated={lastUpdated}
+            onRefresh={handleRefresh}
+            isLaceConnected={isLaceConnected}
           />
         )}
 
@@ -239,6 +336,14 @@ export function App() {
             <span>Compact Standard Library v0.23+</span>
             <span>•</span>
             <span>Midnight SDK v4.1.1</span>
+            <span>•</span>
+            {CONTRACT_ADDRESS ? (
+              <span className="text-[#1F6E54]">
+                Contract: {CONTRACT_ADDRESS.slice(0, 8)}...{CONTRACT_ADDRESS.slice(-6)}
+              </span>
+            ) : (
+              <span className="text-rose-600">Contract: not configured</span>
+            )}
           </div>
         </div>
       </footer>

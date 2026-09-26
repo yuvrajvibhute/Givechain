@@ -70,7 +70,7 @@ export async function computeWitnessCommitment(
  * @returns Hex-encoded SHA-256 commitment
  */
 export async function computeCommitmentFromBytes(secretBytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', secretBytes);
+  const digest = await crypto.subtle.digest('SHA-256', secretBytes as unknown as BufferSource);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');

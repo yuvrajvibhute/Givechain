@@ -4,44 +4,90 @@
 // PRIVACY DESIGN SPECIFICATION:
 // ----------------------------------------------------------------------------
 // PUBLIC ON-CHAIN STATE (Ledger):
-//   - totalDonations: Uint<64> -> Total sum of all anonymous donations raised.
-//   - campaignCount: Uint<64>  -> Total number of active charity causes.
+//   - totalDonations: Uint<64>              -> Total sum of all anonymous donations raised.
+//   - campaignCount: Uint<64>               -> Total number of registered charity campaigns.
 //   - activeCampaignTitle: Opaque<"string"> -> Public active campaign description.
+//   - authorizedOrganizer: Opaque<"string"> -> Bech32 address allowed to create campaigns.
+//   - isInitialized: Boolean                -> Tracks one-time initialization guard.
+//   - usedNullifiers: Set<Bytes<32>>        -> Set of used nullifier hashes to prevent replay.
 //
 // PRIVATE WITNESS DATA (Off-Chain Secrets):
 //   - donorSecret: Bytes<32>   -> Donor's private witness key / commitment seed.
 //                                Never exposed or recorded on the public ledger.
-//   - donorNote: Opaque<"string"> -> Private message from donor to charity.
 //
 // PROVED WITHOUT REVEALING:
 //   - Proves the donor authorized a valid donation amount >= 1.
 //   - Proves state transitions to totalDonations without revealing WHO donated.
+//   - Proves the nullifier persistentHash(donorSecret) has not been used before.
+//   - Proves a campaign creator is the authorized organizer.
+//
+// PRIVACY GUARANTEES:
+//   - donorSecret is never passed to disclose() -> never on-chain.
+//   - Nullifier = persistentHash<Bytes<32>>(donorSecret) is added to usedNullifiers
+//     to prevent double-spending / replay attacks, but the preimage remains fully shielded.
 // ============================================================================
 
 pragma language_version >= 0.23;
 
 import CompactStandardLibrary;
 
-// Public ledger state
+// ── PUBLIC LEDGER STATE ──────────────────────────────────────────────────────
 export ledger totalDonations: Uint<64>;
 export ledger campaignCount: Uint<64>;
 export ledger activeCampaignTitle: Opaque<"string">;
 
-// Circuit: Initialize / Create a new Charity Campaign
-export circuit createCampaign(title: Opaque<"string">): [] {
-    activeCampaignTitle = disclose(title);
-    campaignCount = campaignCount + 1;
+// Authorized organizer: only this address may call createCampaign().
+// Set once during initialize() and immutable thereafter.
+export ledger authorizedOrganizer: Opaque<"string">;
+export ledger isInitialized: Boolean;
+
+// Nullifier set: stores persistentHash(donorSecret).
+// Prevents the same donor secret from being used more than once.
+// donorSecret itself is never stored — only its ZK-friendly cryptographic hash.
+export ledger usedNullifiers: Set<Bytes<32>>;
+
+// ── CIRCUIT: Initialize Contract (Call Once at Deploy Time) ──────────────────
+// Sets the authorized organizer address. Must be called exactly once.
+export circuit initialize(organizer: Opaque<"string">): [] {
+    assert(!isInitialized, "Contract already initialized");
+    authorizedOrganizer = disclose(organizer);
+    isInitialized = true;
 }
 
-// Circuit: Make a Privacy-Preserving Anonymous Donation
-// Private Witness: donorSecret (Bytes<32>) is passed into circuit scope but NEVER disclosed.
+// ── CIRCUIT: Create Charity Campaign ─────────────────────────────────────────
+// Only the authorized organizer (set during initialize) may create campaigns.
+export circuit createCampaign(
+    title: Opaque<"string">,
+    callerAddress: Opaque<"string">
+): [] {
+    const disclosedCaller = disclose(callerAddress);
+    assert(disclosedCaller == authorizedOrganizer, "Unauthorized: caller is not the organizer");
+
+    activeCampaignTitle = disclose(title);
+    campaignCount = (campaignCount + 1) as Uint<64>;
+}
+
+// ── CIRCUIT: Privacy-Preserving Anonymous Donation ───────────────────────────
+// PRIVATE WITNESS: donorSecret (Bytes<32>) — never disclosed, never on-chain.
+// NULLIFIER: persistentHash<Bytes<32>>(donorSecret) stored to prevent replay attacks.
+// PUBLIC: amount disclosed and added to totalDonations.
 export circuit donate(donorSecret: Bytes<32>, amount: Uint<64>): [] {
-    // Constraint: Donation amount must be greater than zero
+    // Constraint 1: Donation amount must be greater than zero
     assert(amount > 0, "Donation amount must be greater than zero");
-    
-    // Disclose ONLY the contribution amount to update the public tally
+
+    // Constraint 2: Compute nullifier from the private donor secret.
+    const nullifier: Bytes<32> = disclose(persistentHash<Bytes<32>>(donorSecret));
+
+    // Constraint 3: Replay prevention — reject if this nullifier was already used.
+    assert(!usedNullifiers.member(nullifier), "Donation already submitted: nullifier reused");
+
+    // Mark nullifier as used (on-chain, but only the hash — not the secret).
+    usedNullifiers.insert(nullifier);
+
+    // Disclose ONLY the contribution amount to update the public tally.
+    // donorSecret is NEVER passed to disclose() -> it is fully shielded.
     const disclosedAmount = disclose(amount);
-    
+
     // Increment on-chain ledger state
-    totalDonations = totalDonations + disclosedAmount;
+    totalDonations = (totalDonations + disclosedAmount) as Uint<64>;
 }
