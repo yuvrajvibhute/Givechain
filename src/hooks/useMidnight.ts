@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { connectOneAmWallet, disconnectOneAmWallet, getAvailableWallets, getOneAmWallet } from '../dapp-connector';
 
 export interface MidnightWalletState {
   isConnected: boolean;
@@ -17,52 +18,33 @@ export function useMidnight() {
     error: null,
   });
 
-  const connectWallet = useCallback(async () => {
+  const connectWallet = useCallback(async (networkId: string = 'preview') => {
     try {
-      // Dynamic DApp connector API discovery (Object.values(window.midnight))
-      const midnightWindow = (window as unknown as { midnight?: Record<string, any> }).midnight;
-
-      if (!midnightWindow || Object.keys(midnightWindow).length === 0) {
-        setWalletState((prev) => ({
-          ...prev,
-          error: 'No Midnight DApp Connector wallet found. Please install Lace wallet.',
-        }));
-        return;
-      }
-
-      const availableWallets = Object.values(midnightWindow);
-      const selectedWallet = availableWallets[0];
-
-      if (selectedWallet && typeof selectedWallet.enable === 'function') {
-        const api = await selectedWallet.enable();
-        const state = await api.state();
-        const address = state?.address || 'mn_addr_preview1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s';
-
+      const result = await connectOneAmWallet(undefined, networkId);
+      if (result.connected && result.address) {
         setWalletState({
           isConnected: true,
-          walletName: selectedWallet.name || 'Lace Wallet',
-          address,
-          network: 'preview',
+          walletName: result.walletName || '1AM Wallet',
+          address: result.address,
+          network: networkId,
           error: null,
         });
       } else {
-        setWalletState({
-          isConnected: true,
-          walletName: 'Lace Wallet',
-          address: 'mn_addr_preview1h3ssm5ru2t6eqy4g3she78zlxn96e36ms6pq996aduvmateh9p9sk96u7s',
-          network: 'preview',
-          error: null,
-        });
+        setWalletState((prev) => ({
+          ...prev,
+          error: result.error || 'Failed to connect 1AM Wallet.',
+        }));
       }
     } catch (err: any) {
       setWalletState((prev) => ({
         ...prev,
-        error: err?.message || 'Failed to connect Midnight wallet.',
+        error: err?.message || 'Failed to connect 1AM Wallet.',
       }));
     }
   }, []);
 
-  const disconnectWallet = useCallback(() => {
+  const disconnectWallet = useCallback(async () => {
+    await disconnectOneAmWallet();
     setWalletState({
       isConnected: false,
       walletName: null,
@@ -72,17 +54,10 @@ export function useMidnight() {
     });
   }, []);
 
-  useEffect(() => {
-    // Initial check for installed extensions
-    const midnightWindow = (window as unknown as { midnight?: Record<string, any> }).midnight;
-    if (midnightWindow && Object.keys(midnightWindow).length > 0) {
-      // Wallet detected
-    }
-  }, []);
-
   return {
     ...walletState,
     connectWallet,
     disconnectWallet,
+    isWalletAvailable: !!getOneAmWallet() || getAvailableWallets().length > 0,
   };
 }

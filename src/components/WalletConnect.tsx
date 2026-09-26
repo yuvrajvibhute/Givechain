@@ -35,7 +35,7 @@ export const WalletConnect: React.FC = () => {
         </div>
       ) : (
         <button
-          onClick={connectWallet}
+          onClick={() => void connectWallet()}
           className="gradient-btn text-xs"
         >
           <Wallet className="w-4 h-4" />

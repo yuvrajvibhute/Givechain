@@ -31,7 +31,7 @@ export const WalletTab: React.FC<WalletTabProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="w-5 h-5 text-[#0D3B4C]" />
-            <h2 className="text-xl font-bold font-serif text-[#0D3B4C]">Lace Browser Wallet & Token Balances</h2>
+            <h2 className="text-xl font-bold font-serif text-[#0D3B4C]">1AM Browser Wallet & Token Balances</h2>
           </div>
           <p className="text-xs text-[#57656E]">
             Inspect active unshielded address and native tNIGHT / DUST protocol assets on Midnight {activeNetwork.toUpperCase()}.

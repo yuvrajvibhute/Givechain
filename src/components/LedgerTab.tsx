@@ -18,6 +18,7 @@ interface LedgerTabProps {
   stateError?: string | null;
   lastUpdated?: string | null;
   onRefresh?: () => void;
+  isWalletConnected?: boolean;
   isLaceConnected?: boolean;
 }
 
@@ -35,6 +36,7 @@ export const LedgerTab: React.FC<LedgerTabProps> = ({
   stateError = null,
   lastUpdated = null,
   onRefresh,
+  isWalletConnected = false,
   isLaceConnected = false,
 }) => {
   const [campaigns, setCampaigns] = useState<CharityCampaign[]>(campaignsProp ?? []);

@@ -10,9 +10,13 @@ interface HeaderProps {
   walletAddress: string;
   isSyncing: boolean;
   onRefresh: () => void;
-  onOpenLaceModal: () => void;
-  onDisconnectLace: () => void;
-  isLaceConnected: boolean;
+  onOpenWalletModal: () => void;
+  onDisconnectWallet: () => void;
+  isWalletConnected: boolean;
+  // Backward compatibility aliases
+  onOpenLaceModal?: () => void;
+  onDisconnectLace?: () => void;
+  isLaceConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,10 +27,16 @@ export const Header: React.FC<HeaderProps> = ({
   walletAddress,
   isSyncing,
   onRefresh,
+  onOpenWalletModal,
+  onDisconnectWallet,
+  isWalletConnected,
   onOpenLaceModal,
   onDisconnectLace,
-  isLaceConnected,
+  isLaceConnected: isLaceProp,
 }) => {
+  const isConnected = isWalletConnected ?? isLaceProp ?? false;
+  const handleOpenModal = onOpenWalletModal || onOpenLaceModal || (() => {});
+  const handleDisconnect = onDisconnectWallet || onDisconnectLace || (() => {});
   const currentConfig = NETWORKS[activeNetwork] || NETWORKS.preprod;
 
   const truncateAddr = (addr: string) => {
@@ -103,18 +113,18 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           )}
 
-          {/* Lace Wallet Status & Disconnect Button */}
-          {isLaceConnected ? (
+          {/* 1AM Wallet Status & Disconnect Button */}
+          {isConnected ? (
             <div className="flex items-center gap-1">
               <button
-                onClick={onOpenLaceModal}
+                onClick={handleOpenModal}
                 className="text-xs font-semibold px-3 py-1.5 rounded-l-lg border border-[#1F6E54]/30 bg-[#1F6E54]/10 text-[#1F6E54] hover:bg-[#1F6E54]/20 transition"
               >
-                Lace Connected
+                1AM Connected
               </button>
               <button
-                onClick={onDisconnectLace}
-                title="Disconnect Lace Wallet"
+                onClick={handleDisconnect}
+                title="Disconnect 1AM Wallet"
                 className="text-xs font-semibold px-2 py-1.5 rounded-r-lg border border-l-0 border-[#1F6E54]/30 bg-[#1F6E54]/10 text-[#1F6E54] hover:bg-rose-100 hover:text-rose-700 transition"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -122,10 +132,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           ) : (
             <button
-              onClick={onOpenLaceModal}
+              onClick={handleOpenModal}
               className="cta-button !py-1.5 !px-3.5 !text-xs"
             >
-              Connect Lace
+              Connect 1AM Wallet
             </button>
           )}
 

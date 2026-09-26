@@ -103,7 +103,7 @@ export const PrivacyModelTab: React.FC = () => {
               {
                 field: 'Donor wallet address',
                 type: 'Identity',
-                desc: 'The Lace wallet address of the donor. Not part of any circuit output — completely unlinkable.',
+                desc: 'The 1AM wallet address of the donor. Not part of any circuit output — completely unlinkable.',
                 risk: 'Linkability prevention',
               },
               {

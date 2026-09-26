@@ -6,14 +6,14 @@ import { ProofVisualizerTab } from './components/ProofVisualizerTab';
 import { WalletTab } from './components/WalletTab';
 import { NetworkTab } from './components/NetworkTab';
 import { PrivacyModelTab } from './components/PrivacyModelTab';
-import { LaceWalletModal } from './components/LaceWalletModal';
+import { OneAmWalletModal } from './components/OneAmWalletModal';
 import { INITIAL_CAMPAIGNS, type TransactionRecord } from './api';
 import {
   executeDonateCircuit,
   executeCreateCampaignCircuit,
-  disconnectLaceWallet,
+  disconnectOneAmWallet,
   invalidateContractCache,
-  type DAppConnectorWalletAPI,
+  type ConnectedAPI,
 } from './dapp-connector';
 import { useLiveContractState } from './hooks/useLiveContractState';
 import { useTransactionHistory } from './hooks/useTransactionHistory';
@@ -33,10 +33,10 @@ export function App() {
   const [walletBalance] = useState<string>('—');
   const [dustBalance] = useState<string>('—');
 
-  // Lace wallet connection state
-  const [isLaceModalOpen, setIsLaceModalOpen] = useState(false);
-  const [isLaceConnected, setIsLaceConnected] = useState(false);
-  const [laceWalletContext, setLaceWalletContext] = useState<DAppConnectorWalletAPI | undefined>();
+  // 1AM Wallet connection state
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [walletContext, setWalletContext] = useState<ConnectedAPI | undefined>();
 
   // Local session transactions (from this browser session — merged with indexer history)
   const [localTransactions, setLocalTransactions] = useState<TransactionRecord[]>([]);
@@ -89,21 +89,21 @@ export function App() {
     showToast(`Switched to ${net.toUpperCase()}`, 'info');
   };
 
-  // ─── Lace wallet connect / disconnect ──────────────────────────────────────
-  const handleConnectLace = (newAddress: string, ctx?: DAppConnectorWalletAPI) => {
+  // ─── 1AM Wallet connect / disconnect ──────────────────────────────────────
+  const handleConnectWallet = (newAddress: string, ctx?: ConnectedAPI) => {
     setWalletAddress(newAddress);
-    setIsLaceConnected(true);
-    setLaceWalletContext(ctx);
-    showToast(`Lace Wallet Connected! ${newAddress.slice(0, 14)}...`, 'success');
+    setIsWalletConnected(true);
+    setWalletContext(ctx);
+    showToast(`1AM Wallet Connected! ${newAddress.slice(0, 14)}...`, 'success');
   };
 
-  const handleDisconnectLace = async () => {
-    await disconnectLaceWallet();
+  const handleDisconnectWallet = async () => {
+    await disconnectOneAmWallet();
     invalidateContractCache();
-    setIsLaceConnected(false);
-    setLaceWalletContext(undefined);
+    setIsWalletConnected(false);
+    setWalletContext(undefined);
     setWalletAddress('');
-    showToast('Lace Wallet Disconnected.', 'info');
+    showToast('1AM Wallet Disconnected.', 'info');
   };
 
   // ─── Donate circuit (real Midnight.js callTx) ──────────────────────────────
@@ -112,8 +112,8 @@ export function App() {
       showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
       return;
     }
-    if (!isLaceConnected || !laceWalletContext) {
-      showToast('Please connect your Lace wallet before donating.', 'error');
+    if (!isWalletConnected || !walletContext) {
+      showToast('Please connect your 1AM wallet before donating.', 'error');
       return;
     }
 
@@ -123,11 +123,12 @@ export function App() {
     try {
       // Real callTx.donate() — ZK proof + wallet balancing + signing + submission
       const result = await executeDonateCircuit(
-        donorSecret,
+        campaignTitle,
         amount,
+        donorSecret,
         CONTRACT_ADDRESS,
         activeNetwork,
-        laceWalletContext,
+        walletContext,
       );
 
       const newTx: TransactionRecord = {
@@ -158,7 +159,7 @@ export function App() {
       if (msg.includes('nullifier reused')) {
         showToast('This donor secret was already used. Please use a different secret.', 'error');
       } else if (msg.includes('not connected')) {
-        showToast('Please connect your Lace wallet before donating.', 'error');
+        showToast('Please connect your 1AM wallet before donating.', 'error');
       } else {
         showToast(`Donation failed: ${msg}`, 'error');
       }
@@ -171,8 +172,8 @@ export function App() {
       showToast('Contract address not configured. Set VITE_CONTRACT_ADDRESS in .env', 'error');
       return;
     }
-    if (!isLaceConnected || !laceWalletContext) {
-      showToast('Please connect your Lace wallet to create campaigns.', 'error');
+    if (!isWalletConnected || !walletContext) {
+      showToast('Please connect your 1AM wallet to create campaigns.', 'error');
       return;
     }
 
@@ -183,10 +184,12 @@ export function App() {
       // Real callTx.createCampaign() — proves callerAddress == authorizedOrganizer on-chain
       const result = await executeCreateCampaignCircuit(
         title,
+        _category,
+        _targetAmount,
         CONTRACT_ADDRESS,
         activeNetwork,
-        laceWalletContext,
         walletAddress,
+        walletContext,
       );
 
       const newTx: TransactionRecord = {
@@ -247,18 +250,19 @@ export function App() {
         walletAddress={walletAddress}
         isSyncing={isSyncing}
         onRefresh={handleRefresh}
-        onOpenLaceModal={() => setIsLaceModalOpen(true)}
-        onDisconnectLace={handleDisconnectLace}
-        isLaceConnected={isLaceConnected}
+        onOpenWalletModal={() => setIsWalletModalOpen(true)}
+        onDisconnectWallet={handleDisconnectWallet}
+        isWalletConnected={isWalletConnected}
       />
 
-      {/* Lace Wallet Modal */}
-      <LaceWalletModal
-        isOpen={isLaceModalOpen}
-        onClose={() => setIsLaceModalOpen(false)}
-        onConnectLace={handleConnectLace}
-        onDisconnectLace={handleDisconnectLace}
-        connectedAddress={isLaceConnected ? walletAddress : ''}
+      {/* 1AM Wallet Modal */}
+      <OneAmWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        onConnectWallet={handleConnectWallet}
+        onDisconnectWallet={handleDisconnectWallet}
+        connectedAddress={isWalletConnected ? walletAddress : ''}
+        activeNetwork={activeNetwork}
       />
 
       {/* Main App Container */}
@@ -304,7 +308,8 @@ export function App() {
             stateError={stateError}
             lastUpdated={lastUpdated}
             onRefresh={handleRefresh}
-            isLaceConnected={isLaceConnected}
+            isWalletConnected={isWalletConnected}
+            isLaceConnected={isWalletConnected}
           />
         )}
 

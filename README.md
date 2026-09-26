@@ -190,7 +190,7 @@ This executes the full path: **wallet → ZK proof → Preprod chain → indexer
 ### Prerequisites
 - Node.js >= 22.0.0
 - Docker Desktop (for local proof server)
-- Lace browser extension (for frontend circuit execution)
+- 1AM Wallet browser extension (for frontend circuit execution)
 
 ### Setup
 
@@ -291,7 +291,7 @@ yuvi/
 | 4 | `feat(network): add multi-network resolver for Preview and Preprod testnets` | Network layer |
 | 5 | `feat(sdk): integrate @midnight-ntwrk/dapp-connector-api and network provider` | SDK integration |
 | 6 | `feat(frontend): build React 19 visual dashboard with institutional theme` | Frontend |
-| 7 | `feat(lace): implement Lace wallet modal with connect/disconnect/rejection handlers` | Wallet integration |
+| 7 | `feat(wallet): implement 1AM wallet modal with connect/disconnect/rejection handlers` | Wallet integration |
 | 8 | `feat(deploy): deploy contract to Preprod and Preview testnets` | Deployment |
 | 9 | `feat(ci): add GitHub Actions CI pipeline with test, typecheck, and build jobs` | CI/CD |
 | 10 | `feat(privacy): add nullifier replay prevention and campaign authorization to contract` | Privacy model |
