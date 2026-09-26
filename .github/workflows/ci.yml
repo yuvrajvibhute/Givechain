@@ -168,8 +168,8 @@ jobs:
       - name: Build production bundle
         run: npm run build:web
         env:
-          VITE_CONTRACT_ADDRESS: ${{ secrets.VITE_CONTRACT_ADDRESS || '' }}
-          VITE_NETWORK: preprod
+          VITE_CONTRACT_ADDRESS: ${{ secrets.VITE_CONTRACT_ADDRESS || '7715b2ade8a1143196d232dd26ac732aef83a390503bf7d308d2d4bf741294b9' }}
+          VITE_NETWORK: preview
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

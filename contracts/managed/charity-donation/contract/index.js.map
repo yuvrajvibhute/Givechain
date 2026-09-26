@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../../../",
+  "sources": ["contracts/charity_donation.compact", "compiler/standard-library.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EA6BA;;;;;;;;;;MAqBA,AAAA,UAIC;;;;;cAJyB,WAA2B;;;;;;;;;;;yCAA3B,WAA2B;;;;;;;;;4CAA3B,WAA2B;;;OAIpD;MAID,AAAA,cASC;;;;;cARG,OAAuB;cACvB,eAA+B;;;;;;;;;;;yCAD/B,OAAuB,+BACvB,eAA+B;;;;;;;;;gDAD/B,OAAuB;gDACvB,eAA+B;;;OAOlC;MAMD,AAAA,MAmBC;;;;;cAnBqB,aAAsB;cAAE,QAAgB;;;;;;;;;;;;;;;;;;;;;;;;;yCAAxC,aAAsB,+BAAE,QAAgB;;;;;;;;;wCAAxC,aAAsB;wCAAE,QAAgB;;;OAmB7D;;;;;;;;;;;;GACA;EAhED;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;IAKA;;;;;;;;;yEAAuC;IACvC;;;;;;;;;yEAAsC;IACtC;;;;;;;;;yEAAoD;IAIpD;;;;;;;;;yEAAoD;IACpD;;;;;;;;;yEAAqC;IAKrC;;;;;;;;;;yEAA6C;;;;;;;GA+C5C;EC7FD,AAAA,kBAAA;oEAAA;;;EDkDA,AAAA,aAIC,4BAJyB,WAA2B;qDACzC;;;;;;;;;;;0HAAa;;IACrB;;;;;;;2HAA+B,WAAS;;yEAArB;IACnB;;;;;;;;;yEAAa;;GAChB;EAID,AAAA,iBASC,4BARG,OAAuB,EACvB,eAA+B;UAEzB,iBAAyC,GAAd,eAAa;4BACvC,iBAAe;;oDAAI;;;;;;;;;;;yHAAmB;;IAE7C;;;;;;;2HAA+B,OAAK;;yEAAjB;UACnB,KAAa;;;;;6CAAI;;;;;;;;;;;kHAAa;;;IAA9B;;;;;;;2HAAA,KAAa;;yEAAA;;GAChB;EAMD,AAAA,SAmBC,4BAnBqB,aAAsB,EAAE,QAAgB;4BAEnD,QAAM;;UAGP,WAAuE,0BAAb,aAAW;qDAGnE;;;;;;;;;;;4KAAsB,WAAS;;;;0HAAjB;;IAGtB;;;;;;;;;;2HAAsB,WAAS;;;;;wEAAjB;UAIR,iBAAkC,GAAP,QAAM;UAGvC,KAAc;;;;;6CAAI;;;;;;;;;;;kHAAc;;qBAAG,iBAAe;IAAlD;;;;;;;2HAAA,KAAc;;yEAAA;;GACjB;;;;;;;;;;;;;;;;IA1DD;qCAAA;;;;;;;;;;;0GAAuC;KAAA;IACvC;qCAAA;;;;;;;;;;;0GAAsC;KAAA;IACtC;qCAAA;;;;;;;;;;;0GAAoD;KAAA;IAIpD;qCAAA;;;;;;;;;;;0GAAoD;KAAA;IACpD;qCAAA;;;;;;;;;;;0GAAqC;KAAA;IAKrC;;;;;uCAAA;;;;;;;;;;;;;;;;4GAA6C;;;;;;uCAA7C;;;;;;;;;;;;4GAA6C;;;;;;;;;;;;;;uCAA7C;;;;;;;;;;;;;;;4GAA6C;;;;;;;;;KAAA;;;;;;;;;;"
+}
